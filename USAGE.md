@@ -158,7 +158,10 @@ migration to support that.
 
 ## Migrator API
 
-The previous exmple shows the files
+The previous exmple shows the files that were created automatically to support two models. The
+argument to upgrade() and downgrade() is a migrator instance that has a database-agnostic API.
+This allows you to write command in Python that will get executed against the database when you
+call upgrade or downgrade.
 
 Here's a full example of everything you can do in either upgrade() or downgrade() using the migrator
 API:
@@ -199,6 +202,9 @@ cursor = migrator.execute_sql(sql, params=None)
 
 The kwargs are passed to the field as they would be if you were defining
 the field on the model itself.
+
+The migrator.execute_sql allows for writing direct SQL if you need to. There's nothing stopping
+you from writing something specific to your database engine using this method.
 
 And remember, the migration files are just Python! So you can import and run other Python code
 if needed.
