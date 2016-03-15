@@ -213,7 +213,6 @@ class DatabaseManager:
                 return name
             if name.startswith('{}_'.format(value)):
                 return name
-            print(name, value)
         raise ValueError('could not find migration: {}'.format(value))
 
     def get_ident(self):
@@ -334,7 +333,7 @@ class DatabaseManager:
             return False
 
         try:
-            print('{}: {}'.format(migration, direction))
+            print('===={}: {}'.format(migration, direction))
             with self.database.transaction():
                 scope = {}
                 with self.open_migration(migration, 'r') as handle:
