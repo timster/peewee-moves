@@ -4,6 +4,9 @@ A simple and flexible migration manager for [Peewee ORM](http://docs.peewee-orm.
 
 ## Requirements
 
+- Python 3 or later
+- Peewee 2.8.0 or later
+
 ## Installation
 
 This package can be installed using pip:
