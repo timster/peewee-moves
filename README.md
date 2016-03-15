@@ -44,12 +44,11 @@ def upgrade(migrator):
         table.integer('code', unique=True)
         table.string('name', max_length=250)
 
-
 def downgrade(migrator):
     migrator.drop_table('category')
 ```
 
-Check out the [Usage](USAGE.md) docuemnt for more details.
+Check out the [Usage documentation](USAGE.md) for more details.
 
 ## Todo
 

@@ -76,7 +76,7 @@ might never need this, but it could be useful in some circumstances.
 ### Automagic migration file
 
 It's possible to create a migration file automatically that will have the operations necessary to
-upgrade and downgrade your models automatically.
+upgrade and downgrade your existing models.
 
 Let's say you have the following two models defined in `models.py`:
 
@@ -211,7 +211,7 @@ if needed.
 
 ## Flask Usage
 
-This package includes and interface to Flask-Script which provides an easy-to-use command line
+This package includes an interface to Flask-Script which provides an easy-to-use command line
 interface.
 
 To set up, you first need to make sure you have DATABASE defiend in your configuration:
