@@ -62,7 +62,7 @@ if FLASK_SCRIPT:
 
     def get_database_manager():
         """Return a DatabaseManager for the current Flask application."""
-        return DatabaseManager(current_app.config['DATABASE'], 'app/migrations')
+        return DatabaseManager(current_app.config['DATABASE'], directory='app/migrations')
 
     @migration_manager.option('-m', '--model', dest='model', required=True)
     def create(model):

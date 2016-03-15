@@ -9,7 +9,7 @@ with open(path.join(root_dir, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='peewee-moves',
-    version='0.0.1',
+    version='0.0.2',
 
     description='Simple and flexible migration manager for Peewee ORM.',
     long_description=long_description,
