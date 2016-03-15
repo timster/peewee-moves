@@ -19,7 +19,6 @@ except ImportError:
 __all__ = ['migration_manager', 'MigrationHistory', 'DatabaseManager', 'TableCreator', 'Migrator']
 
 FIELD_TO_PEEWEE = {
-    'primary_key': peewee.PrimaryKeyField,
     'bare': peewee.BareField,
     'biginteger': peewee.BigIntegerField,
     'binary': peewee.BinaryField,
@@ -39,6 +38,7 @@ FIELD_TO_PEEWEE = {
 }
 
 PEEWEE_TO_FIELD = {value: key for key, value in FIELD_TO_PEEWEE.items()}
+PEEWEE_TO_FIELD[peewee.PrimaryKeyField] = 'primary_key'
 PEEWEE_TO_FIELD[peewee.ForeignKeyField] = 'foreign_key'
 
 FIELD_KWARGS = (
@@ -333,7 +333,7 @@ class DatabaseManager:
             return False
 
         try:
-            print('===={}: {}'.format(migration, direction))
+            print('{}: {}'.format(migration, direction))
             with self.database.transaction():
                 scope = {}
                 with self.open_migration(migration, 'r') as handle:
@@ -432,6 +432,16 @@ class TableCreator:
     def add_constraint(self, value):
         """Add a constraint to the model."""
         self.model._meta.constraints.append(peewee.SQL(value))
+
+    def primary_key(self, name):
+        """
+        Add a primary key to the model.
+        This has some special cases, which is why it's not handled like all the other column types.
+        """
+        pkfield = peewee.PrimaryKeyField(primary_key=True)
+        self.model._meta.primary_key = pkfield
+        self.model._meta.auto_increment = True
+        pkfield.add_to_class(self.model, name)
 
     def foreign_key(self, name, references, **kwargs):
         """
