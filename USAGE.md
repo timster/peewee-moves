@@ -19,7 +19,7 @@ manager = DatabaseManager('sqlite:///test.sqlite')
 
 From there, you can call methods to manage and run migration files.
 
-### New migration file
+### New Migration
 
 This will create a blank migration file with the next ID and the default name of "automigration"
 or whatever name you provide
@@ -30,7 +30,7 @@ or whatever name you provide
     >>> manager.revision('custom name')
     created migration 0002_custom_name
 
-### Database upgrade
+### Database Upgrade
 
 This will run the upgrade() method in each unapplied migration. If you specify a target, the
 migrator will only run upgrades through that target. If no target is specified, all unapplied
@@ -43,7 +43,7 @@ migrations will run.
     0002_custom_name: upgrade
     0003_another_migration: upgrade
 
-### Database downgrade
+### Database Downgrade
 
 This does the opposite of upgrade(). It calls the downgrade() method on each applied migration. If
 you specify a target, the migrator will only run downgrades through that target. If no target is
@@ -56,7 +56,15 @@ specified, only the most recent migration will be downgraded.
     0002_custom_name: downgrade
     0001_automigration: downgrade
 
-### Show status
+### Delete Migration
+
+This will remove a migration from the database and the filesystem, as if it never happened. You
+might never need this, but it could be useful in some circumstances.
+
+    >>> manager.delete('0003')
+    0003_another_migration: delete
+
+### Migration Status
 
 This will simply show the status of each migration file so you can see which ones have been applied.
 
@@ -65,15 +73,7 @@ This will simply show the status of each migration file so you can see which one
     0002_custom_name: applied
     0003_another_migration: pending
 
-### Delete migration
-
-This will remove a migration from the database and the filesystem, as if it never happened. You
-might never need this, but it could be useful in some circumstances.
-
-    >>> manager.delete('0003')
-    0003_another_migration: delete
-
-### Automagic migration file
+### Automagic Migration Creation
 
 It's possible to create a migration file automatically that will have the operations necessary to
 upgrade and downgrade your existing models.
@@ -125,7 +125,7 @@ def upgrade(migrator):
     with migrator.create_table('auth_groups') as table:
         table.primary_key('id')
         table.integer('code')
-        table.string('name', max_length=250)
+        table.char('name', max_length=250)
         table.add_index(('code', 'name'), unique=True)
 
 def downgrade(migrator):
@@ -139,7 +139,7 @@ def upgrade(migrator):
     with migrator.create_table('auth_users') as table:
         table.primary_key('id')
         table.integer('code', unique=True)
-        table.string('name', max_length=250)
+        table.char('name', max_length=250)
         table.foreign_key('group_id', references='auth_groups.id')
 
 def downgrade(migrator):
@@ -181,12 +181,13 @@ with migrator.create_table(self, name, safe=False) as table:
     table.fixed('colname', **kwargs)
     table.float('colname', **kwargs)
     table.integer('colname', **kwargs)
-    table.string('colname', **kwargs)
+    table.char('colname', **kwargs)
     table.text('colname', **kwargs)
     table.time('colname', **kwargs)
     table.uuid('colname', **kwargs)
     table.foreign_key('colname', references='othertable.col')
     table.add_index(('col1', 'col2'), unique=True)
+    table.add_constraint('constraint string')
 
 migrator.drop_table('name', safe=False, cascade=False)
 migrator.add_column('table', 'name', 'type', **kwargs)

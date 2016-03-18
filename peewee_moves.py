@@ -5,16 +5,11 @@ import os
 import pydoc
 import sys
 
+from flask import current_app
+from flask_script import Manager
 from playhouse.db_url import connect as db_url_connect
 from playhouse.migrate import SchemaMigrator
 import peewee
-
-try:
-    FLASK_SCRIPT = True
-    from flask import current_app
-    from flask_script import Manager
-except ImportError:
-    FLASK_SCRIPT = False
 
 __all__ = ['migration_manager', 'MigrationHistory', 'DatabaseManager', 'TableCreator', 'Migrator']
 
@@ -31,7 +26,7 @@ FIELD_TO_PEEWEE = {
     'fixed': peewee.FixedCharField,
     'float': peewee.FloatField,
     'integer': peewee.IntegerField,
-    'string': peewee.CharField,
+    'char': peewee.CharField,
     'text': peewee.TextField,
     'time': peewee.TimeField,
     'uuid': peewee.UUIDField,
@@ -46,66 +41,55 @@ FIELD_KWARGS = (
     'max_length', 'max_digits', 'decimal_places'
 )
 
-TEMPLATE = """
-def upgrade(migrator):
-    {upgrade}
+template_lines = (
+    '"""', '{name}', 'date created: {date}', '"""', '', '',
+    'def upgrade(migrator):', '    {upgrade}', '', '',
+    'def downgrade(migrator):', '    {downgrade}'
+)
+TEMPLATE = str.join('\n', template_lines) + '\n'
+
+migration_manager = Manager(usage='{} db [command]'.format(sys.argv[0]))
 
 
-def downgrade(migrator):
-    {downgrade}
-""".lstrip()
+def get_database_manager():
+    """Return a DatabaseManager for the current Flask application."""
+    return DatabaseManager(current_app.config['DATABASE'], directory='app/migrations')
 
 
-if FLASK_SCRIPT:
-
-    migration_manager = Manager(usage='{} db [command]'.format(sys.argv[0]))
-
-    def get_database_manager():
-        """Return a DatabaseManager for the current Flask application."""
-        return DatabaseManager(current_app.config['DATABASE'], directory='app/migrations')
-
-    @migration_manager.option('-m', '--model', dest='model', required=True)
-    def create(model):
-        """Create a migration based on an existing model."""
-        get_database_manager().create(model)
-
-    @migration_manager.option('-n', '--name', dest='name', required=False)
-    def revision(name):
-        """Create a blank migration file."""
-        get_database_manager().revision(name)
-
-    @migration_manager.command
-    def status():
-        """Show all migrations and the status of each."""
-        get_database_manager().status()
-
-    @migration_manager.option('-t', '--target', dest='target', required=False)
-    def upgrade(target):
-        """Run database upgrades."""
-        get_database_manager().upgrade(target)
-
-    @migration_manager.option('-t', '--target', dest='target', required=False)
-    def downgrade(target):
-        """Run database downgrades."""
-        get_database_manager().downgrade(target)
-
-    @migration_manager.option('-t', '--target', dest='target', required=False)
-    def delete(target):
-        """Delete the target migration from the filesystem and database."""
-        get_database_manager().delete(target)
+@migration_manager.option('-m', '--model', dest='model', required=False)
+def create(model):
+    """Create a migration based on an existing model."""
+    get_database_manager().create(model)
 
 
-def build_fake_model(name):
-    """
-    Build a fake model with some defaults and the given table name.
-    We need this so we can perform operations that actually require a model class.
-    """
-    class Meta:
-        primary_key = False
-        indexes = []
-        constraints = []
-        db_table = name
-    return type('FakeModel', (peewee.Model,), {'Meta': Meta})
+@migration_manager.option('-n', '--name', dest='name', required=False)
+def revision(name):
+    """Create a blank migration file."""
+    get_database_manager().revision(name)
+
+
+@migration_manager.command
+def status():
+    """Show all migrations and the status of each."""
+    get_database_manager().status()
+
+
+@migration_manager.option('-t', '--target', dest='target', required=False)
+def upgrade(target):
+    """Run database upgrades."""
+    get_database_manager().upgrade(target)
+
+
+@migration_manager.option('-t', '--target', dest='target', required=False)
+def downgrade(target):
+    """Run database downgrades."""
+    get_database_manager().downgrade(target)
+
+
+@migration_manager.option('-t', '--target', dest='target', required=True)
+def delete(target):
+    """Delete the target migration from the filesystem and database."""
+    get_database_manager().delete(target)
 
 
 def build_downgrade_from_model(model):
@@ -118,7 +102,7 @@ def build_upgrade_from_model(model):
     yield "with migrator.create_table('{}') as table:".format(model._meta.db_table)
 
     for field in model._meta.sorted_fields:
-        coltype = PEEWEE_TO_FIELD.get(field.__class__, 'string')
+        coltype = PEEWEE_TO_FIELD.get(field.__class__, 'char')
 
         # Add all fields. Foreign Key is a special case.
         if coltype == 'foreign_key':
@@ -165,7 +149,6 @@ class DatabaseManager:
         os.makedirs(self.directory, exist_ok=True)
         self.database = self.load_database(database)
         self.migrator = Migrator(self.database)
-        self.compiler = self.database.compiler()
 
         MigrationHistory._meta.database = self.database
         MigrationHistory._meta.db_table = table_name
@@ -250,20 +233,20 @@ class DatabaseManager:
                 cmd.execute()
         except Exception as exc:
             self.database.rollback()
-            print('DELETE-ERROR:', exc)
+            print('ERROR:', exc)
             return False
 
-        print('{}: delete'.format(migration))
+        print('INFO:', '{}: delete'.format(migration))
         return True
 
     def status(self):
         """Show all the migrations and a status for each."""
         if not self.migration_files:
-            print('no migrations found')
+            print('INFO:', 'no migrations found')
             return True
         for name in self.migration_files:
             status = 'applied' if name in self.db_migrations else 'pending'
-            print('{}: {}'.format(name, status))
+            print('INFO:', '{}: {}'.format(name, status))
         return True
 
     def upgrade(self, target=None):
@@ -272,10 +255,10 @@ class DatabaseManager:
             if target:
                 target = self.find_migration(target)
                 if target in self.db_migrations:
-                    print('{}: already applied'.format(target))
+                    print('INFO:', '{}: already applied'.format(target))
                     return False
         except ValueError as exc:
-            print('UPGRADE-ERROR:', exc)
+            print('ERROR:', exc)
             return False
 
         if self.diff:
@@ -287,7 +270,7 @@ class DatabaseManager:
                     break
             return True
 
-        print('all migrations applied!')
+        print('INFO:', 'all migrations applied!')
         return True
 
     def downgrade(self, target=None):
@@ -296,10 +279,10 @@ class DatabaseManager:
             if target:
                 target = self.find_migration(target)
                 if target not in self.db_migrations:
-                    print('{}: not yet applied'.format(target))
+                    print('INFO:', '{}: not yet applied'.format(target))
                     return False
         except ValueError as exc:
-            print('UPGRADE-ERROR:', exc)
+            print('ERROR:', exc)
             return False
 
         diff = self.db_migrations[::-1]
@@ -312,7 +295,7 @@ class DatabaseManager:
                     break
             return True
 
-        print('migrations not yet applied!')
+        print('INFO:', 'migrations not yet applied!')
         return True
 
     def run_migration(self, migration, direction='upgrade'):
@@ -321,19 +304,19 @@ class DatabaseManager:
             migration = self.find_migration(migration)
 
             if direction == 'upgrade' and migration in self.db_migrations:
-                print('{}: already applied'.format(migration))
+                print('INFO:', '{}: already applied'.format(migration))
                 return False
 
             if direction == 'downgrade' and migration not in self.db_migrations:
-                print('{}: not yet applied'.format(migration))
+                print('INFO:', '{}: not yet applied'.format(migration))
                 return False
 
         except ValueError as exc:
-            print('RUN-ERROR:', exc)
+            print('ERROR:', exc)
             return False
 
         try:
-            print('{}: {}'.format(migration, direction))
+            print('INFO:', '{}: {}'.format(migration, direction))
             with self.database.transaction():
                 scope = {}
                 with self.open_migration(migration, 'r') as handle:
@@ -349,7 +332,8 @@ class DatabaseManager:
                     instance.delete_instance()
         except Exception as exc:
             self.database.rollback()
-            print('RUN-ERROR:', exc)
+            raise
+            # print('ERROR:', exc)
             return False
 
         return True
@@ -360,26 +344,31 @@ class DatabaseManager:
             if name is None:
                 name = 'automigration'
             migration = self.next_migration(name)
-            print('created migration {}'.format(migration))
+            print('INFO:', 'created migration {}'.format(migration))
 
             with self.open_migration(migration, 'w') as handle:
-                handle.write(TEMPLATE.format(upgrade='pass', downgrade='pass'))
+                handle.write(TEMPLATE.format(
+                    name=name,
+                    date=datetime.utcnow(),
+                    upgrade='pass',
+                    downgrade='pass'))
         except Exception as exc:
-            print('REVISION-ERROR:', exc)
+            print('ERROR:', exc)
             return False
 
         return True
 
-    def create(self, model):
+    def create(self, modelstr):
         """
         Create a new migration file for an existing model.
         Model could actually also be a module, in which case all Peewee models are extracted
         from the model and created.
         """
-        if isinstance(model, str):
-            model = pydoc.locate(model)
+        model = modelstr
+        if isinstance(modelstr, str):
+            model = pydoc.locate(modelstr)
             if not model:
-                print('could not import: {}'.format(model))
+                print('INFO:', 'could not import: {}'.format(modelstr))
                 return False
 
         # If it's a module, we need to loop through all the models in it.
@@ -393,32 +382,49 @@ class DatabaseManager:
             return True
 
         try:
-            name = 'create_table_{}'.format(model._meta.db_table.lower())
+            name = 'create table {}'.format(model._meta.db_table.lower())
             migration = self.next_migration(name)
 
             upgrade_ops = str.join('\n', build_upgrade_from_model(model))
             downgrade_ops = str.join('\n', build_downgrade_from_model(model))
 
             with self.open_migration(migration, 'w') as handle:
-                handle.write(TEMPLATE.format(upgrade=upgrade_ops, downgrade=downgrade_ops))
+                handle.write(TEMPLATE.format(
+                    name=name,
+                    date=datetime.utcnow(),
+                    upgrade=upgrade_ops,
+                    downgrade=downgrade_ops))
         except Exception as exc:
-            print('CREATE-ERROR:', exc)
+            print('ERROR:', exc)
             return False
 
-        print('created migration {}'.format(migration))
+        print('INFO:', 'created migration {}'.format(migration))
         return True
 
 
 class TableCreator:
     def __init__(self, name):
         self.name = name
-        self.model = build_fake_model(self.name)
+        self.model = TableCreator.build_fake_model(self.name)
 
         # Dynamically add a method for all of the field types.
         for fieldname, fieldtype in FIELD_TO_PEEWEE.items():
             def method(name, **kwargs):
                 self.column(fieldtype, name, **kwargs)
             setattr(self, fieldname, method)
+
+    @staticmethod
+    def build_fake_model(name):
+        """
+        Build a fake model with some defaults and the given table name.
+        We need this so we can perform operations that actually require a model class.
+        """
+        class Meta:
+            primary_key = False
+            indexes = []
+            constraints = []
+            db_table = name
+        return type('FakeModel', (peewee.Model,), {'Meta': Meta})
 
     def column(self, coltype, name, **kwargs):
         """Generic method to add a column of any type."""
@@ -461,6 +467,7 @@ class TableCreator:
         if on_update:
             const += ' ON UPDATE {}'.format(on_update)
 
+        kwargs['index'] = True
         self.column('integer', name, **kwargs)
         self.add_constraint(const)
 
@@ -473,11 +480,20 @@ class Migrator:
     @contextmanager
     def create_table(self, name, safe=False):
         table = TableCreator(name)
+
         yield table
+
         self.database.create_table(table.model, safe=safe)
 
+        for field in table.model._fields_to_index():
+            self.database.create_index(table.model, [field], field.unique)
+
+        if table.model._meta.indexes:
+            for fields, unique in table.model._meta.indexes:
+                self.database.create_index(table.model, fields, unique)
+
     def drop_table(self, name, safe=False, cascade=False):
-        model = build_fake_model(name)
+        model = TableCreator.build_fake_model(name)
         self.database.drop_table(model, fail_silently=safe, cascade=cascade)
 
     def add_column(self, table, name, coltype, **kwargs):
