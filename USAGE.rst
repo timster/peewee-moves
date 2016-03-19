@@ -44,6 +44,8 @@ This will run the upgrade() method in each unapplied migration. If you specify a
 migrator will only run upgrades through that target. If no target is specified, all unapplied
 migrations will run.
 
+.. code:: console
+
     >>> manager.upgrade('0001')
     INFO: 0001_automigration: upgrade
 
@@ -58,6 +60,8 @@ This does the opposite of upgrade(). It calls the downgrade() method on each app
 you specify a target, the migrator will only run downgrades through that target. If no target is
 specified, only the most recent migration will be downgraded.
 
+.. code:: console
+
     >>> manager.downgrade()
     INFO: 0003_another_migration: downgrade
 
@@ -71,6 +75,8 @@ Delete Migration
 This will remove a migration from the database and the filesystem, as if it never happened. You
 might never need this, but it could be useful in some circumstances.
 
+.. code:: console
+
     >>> manager.delete('0003')
     INFO: 0003_another_migration: delete
 
@@ -78,6 +84,8 @@ Migration Status
 ----------------
 
 This will simply show the status of each migration file so you can see which ones have been applied.
+
+.. code:: console
 
     >>> manager.status()
     INFO: 0001_automigration: applied
