@@ -242,7 +242,8 @@ def test_run_migration_exception(tmpdir, capsys):
 
     manager.upgrade()
     out, err = capsys.readouterr()
-    assert out == "INFO: 0001_automigration: upgrade\nERROR: name 'undefined' is not defined\n"
+    assert "INFO: 0001_automigration: upgrade" in out
+    assert "'undefined' is not defined" in out
 
 
 def test_delete(tmpdir, capsys):
