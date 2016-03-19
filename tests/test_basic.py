@@ -3,7 +3,6 @@ import peewee
 
 from peewee_moves import DatabaseManager
 
-database = peewee.SqliteDatabase(':memory:')
 
 
 def test_database_creation(tmpdir):
@@ -34,8 +33,8 @@ def test_database_creation_error(tmpdir):
         DatabaseManager(db, directory=tmpdir)
 
 
-def test_revision(capsys, tmpdir):
-    manager = DatabaseManager(database, directory=tmpdir)
+def test_revision(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     manager.revision()
     out, err = capsys.readouterr()
@@ -46,8 +45,8 @@ def test_revision(capsys, tmpdir):
     assert out == 'INFO: 0002_custom_name: created\n'
 
 
-def test_find_migration(capsys, tmpdir):
-    manager = DatabaseManager(database, directory=tmpdir)
+def test_find_migration(tmpdir):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
 
     rv = manager.find_migration('0001')
@@ -58,3 +57,34 @@ def test_find_migration(capsys, tmpdir):
 
     with pytest.raises(ValueError):
         manager.find_migration('does_not_exist')
+
+
+def test_status(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+
+    manager.status()
+    out, err = capsys.readouterr()
+    assert out == 'INFO: no migrations found\n'
+
+    manager.revision()
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0001_automigration: created\n'
+
+    manager.status()
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0001_automigration: pending\n'
+
+
+def test_files_and_diff(tmpdir):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    manager.revision('custom name')
+
+    rv = manager.db_migrations
+    assert rv == []
+
+    rv = manager.migration_files
+    assert rv == ['0001_automigration', '0002_custom_name']
+
+    rv = manager.diff
+    assert rv == ['0001_automigration', '0002_custom_name']
