@@ -5,11 +5,16 @@ import os
 import pydoc
 import sys
 
-from flask import current_app
-from flask_script import Manager
 from playhouse.db_url import connect as db_url_connect
 from playhouse.migrate import SchemaMigrator
 import peewee
+
+try:
+    FLASK_ENABLED = True
+    from flask import current_app
+    from flask_script import Manager
+except ImportError:
+    FLASK_ENABLED = False
 
 __all__ = ['migration_manager', 'MigrationHistory', 'DatabaseManager', 'TableCreator', 'Migrator']
 
@@ -48,48 +53,44 @@ template_lines = (
 )
 TEMPLATE = str.join('\n', template_lines) + '\n'
 
-migration_manager = Manager(usage='{} db [command]'.format(sys.argv[0]))
 
+if FLASK_ENABLED:
 
-def get_database_manager():
-    """Return a DatabaseManager for the current Flask application."""
-    return DatabaseManager(current_app.config['DATABASE'], directory='app/migrations')
+    migration_manager = Manager(usage='{} db [command]'.format(sys.argv[0]))
 
+    def get_database_manager():
+        """Return a DatabaseManager for the current Flask application."""
+        return DatabaseManager(current_app.config['DATABASE'], directory='app/migrations')
 
-@migration_manager.option('-m', '--model', dest='model', required=False)
-def create(model):
-    """Create a migration based on an existing model."""
-    get_database_manager().create(model)
+    @migration_manager.option('-m', '--model', dest='model', required=False)
+    def create(model):
+        """Create a migration based on an existing model."""
+        get_database_manager().create(model)
 
+    @migration_manager.option('-n', '--name', dest='name', required=False)
+    def revision(name):
+        """Create a blank migration file."""
+        get_database_manager().revision(name)
 
-@migration_manager.option('-n', '--name', dest='name', required=False)
-def revision(name):
-    """Create a blank migration file."""
-    get_database_manager().revision(name)
+    @migration_manager.command
+    def status():
+        """Show all migrations and the status of each."""
+        get_database_manager().status()
 
+    @migration_manager.option('-t', '--target', dest='target', required=False)
+    def upgrade(target):
+        """Run database upgrades."""
+        get_database_manager().upgrade(target)
 
-@migration_manager.command
-def status():
-    """Show all migrations and the status of each."""
-    get_database_manager().status()
+    @migration_manager.option('-t', '--target', dest='target', required=False)
+    def downgrade(target):
+        """Run database downgrades."""
+        get_database_manager().downgrade(target)
 
-
-@migration_manager.option('-t', '--target', dest='target', required=False)
-def upgrade(target):
-    """Run database upgrades."""
-    get_database_manager().upgrade(target)
-
-
-@migration_manager.option('-t', '--target', dest='target', required=False)
-def downgrade(target):
-    """Run database downgrades."""
-    get_database_manager().downgrade(target)
-
-
-@migration_manager.option('-t', '--target', dest='target', required=True)
-def delete(target):
-    """Delete the target migration from the filesystem and database."""
-    get_database_manager().delete(target)
+    @migration_manager.option('-t', '--target', dest='target', required=True)
+    def delete(target):
+        """Delete the target migration from the filesystem and database."""
+        get_database_manager().delete(target)
 
 
 def build_downgrade_from_model(model):
