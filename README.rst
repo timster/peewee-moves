@@ -72,7 +72,7 @@ automatically created based on the definition of the Category model!
     def downgrade(migrator):
         migrator.drop_table('category')
 
-Check out the `Usage documentation <Usage.rst>`_ for more details.
+Check out the `Usage documentation <USAGE.rst>`_ for more details.
 
 Todo
 ====
