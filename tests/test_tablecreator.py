@@ -44,16 +44,3 @@ def test_foreign_key():
 
     const = 'FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE cascade ON UPDATE cascade'
     assert tc.model._meta.constraints[0].value == const
-
-    # assert  == [const]
-
-#         """
-#         Add a primary key to the model.
-#         This has some special cases, which is why it's not handled like all the other column types.
-#         """
-#         pkfield = peewee.PrimaryKeyField(primary_key=True)
-#         self.model._meta.primary_key = pkfield
-#         self.model._meta.auto_increment = True
-#         pkfield.add_to_class(self.model, name)
-
-#     def foreign_key(self, name, references, **kwargs):
