@@ -4,12 +4,12 @@
 *.sublime-project
 *.sublime-workspace
 
-# python stuff
+# python
 .env
 __pycache__/
 *.py[cod]
 
-# packaging stuff
+# packaging
 env/
 build/
 develop-eggs/
@@ -25,6 +25,12 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# testing
+htmlcov
+.coverage
+*.db
+.cache
 
 # logs
 pip-log.txt

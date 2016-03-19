@@ -145,7 +145,7 @@ class MigrationHistory(peewee.Model):
 
 class DatabaseManager:
     def __init__(self, database, table_name='migration_history', directory='migrations'):
-        self.directory = directory
+        self.directory = str(directory)
         os.makedirs(self.directory, exist_ok=True)
         self.database = self.load_database(database)
         self.migrator = Migrator(self.database)
@@ -164,11 +164,12 @@ class DatabaseManager:
                 name = database.pop('name')
                 engine = database.pop('engine')
             except KeyError:
-                raise KeyError('Configuration dict must specify "name" and "engine" keys.')
+                error_msg = 'Configuration dict must specify "name" and "engine" keys.'
+                raise peewee.DatabaseError(error_msg)
 
             db_class = pydoc.locate(engine)
             if not db_class:
-                raise ImportError('Unable to import engine class: {}'.format(engine))
+                raise peewee.DatabaseError('Unable to import engine class: {}'.format(engine))
             return db_class(name, **database)
 
         return db_url_connect(database)
@@ -332,8 +333,7 @@ class DatabaseManager:
                     instance.delete_instance()
         except Exception as exc:
             self.database.rollback()
-            raise
-            # print('ERROR:', exc)
+            print('ERROR:', exc)
             return False
 
         return True
@@ -343,8 +343,9 @@ class DatabaseManager:
         try:
             if name is None:
                 name = 'automigration'
+            name = str(name).lower()
             migration = self.next_migration(name)
-            print('INFO:', 'created migration {}'.format(migration))
+            print('INFO:', '{}: created'.format(migration))
 
             with self.open_migration(migration, 'w') as handle:
                 handle.write(TEMPLATE.format(
