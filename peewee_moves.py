@@ -46,12 +46,12 @@ FIELD_KWARGS = (
     'max_length', 'max_digits', 'decimal_places'
 )
 
-template_lines = (
-    '"""', '{name}', 'date created: {date}', '"""', '', '',
-    'def upgrade(migrator):', '    {upgrade}', '', '',
-    'def downgrade(migrator):', '    {downgrade}'
+TEMPLATE = (
+    '"""\n{name}\ndate created: {date}\n"""\n\n\n',
+    'def upgrade(migrator):\n    {upgrade}\n\n\n',
+    'def downgrade(migrator):\n    {downgrade}\n'
 )
-TEMPLATE = str.join('\n', template_lines) + '\n'
+TEMPLATE = str.join('', TEMPLATE)
 
 
 if FLASK_ENABLED:
