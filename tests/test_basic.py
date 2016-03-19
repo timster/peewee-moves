@@ -4,7 +4,6 @@ import peewee
 from peewee_moves import DatabaseManager
 
 
-
 def test_database_creation(tmpdir):
     db = peewee.SqliteDatabase(':memory:')
     manager = DatabaseManager(db, directory=tmpdir)
@@ -59,6 +58,18 @@ def test_find_migration(tmpdir):
         manager.find_migration('does_not_exist')
 
 
+def test_open_migration(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+
+    with manager.open_migration('0001_automigration') as handle:
+        content = handle.read()
+
+    assert content.startswith('"""\nautomigration')
+    assert 'def upgrade(migrator):\n    pass' in content
+    assert 'def downgrade(migrator):\n    pass' in content
+
+
 def test_status(tmpdir, capsys):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
@@ -88,3 +99,172 @@ def test_files_and_diff(tmpdir):
 
     rv = manager.diff
     assert rv == ['0001_automigration', '0002_custom_name']
+
+
+def test_upgrade_all(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    manager.revision()
+    capsys.readouterr()
+
+    manager.upgrade()
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0001_automigration: upgrade\nINFO: 0002_automigration: upgrade\n'
+
+    assert manager.db_migrations == ['0001_automigration', '0002_automigration']
+    assert manager.diff == []
+
+    # All migrations applied now...
+    manager.upgrade()
+    out, err = capsys.readouterr()
+    assert out == 'INFO: all migrations applied!\n'
+
+
+def test_upgrade_target(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    manager.revision()
+    capsys.readouterr()
+
+    manager.upgrade('0001')
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0001_automigration: upgrade\n'
+
+    assert manager.db_migrations == ['0001_automigration']
+    assert manager.diff == ['0002_automigration']
+
+
+def test_already_upgraded(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    capsys.readouterr()
+
+    manager.upgrade('0001')
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0001_automigration: upgrade\n'
+
+    manager.upgrade('0001')
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0001_automigration: already applied\n'
+
+
+def test_upgrade_target_error(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    capsys.readouterr()
+
+    manager.upgrade('9999')
+    out, err = capsys.readouterr()
+    assert out == 'ERROR: could not find migration: 9999\n'
+
+
+def test_downgrade_nodiff(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.downgrade()
+    out, err = capsys.readouterr()
+    assert out == 'INFO: migrations not yet applied!\n'
+
+
+def test_downgrade_single(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    manager.revision()
+    manager.upgrade()
+    capsys.readouterr()
+
+    assert manager.db_migrations == ['0001_automigration', '0002_automigration']
+    assert manager.diff == []
+
+    manager.downgrade()
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0002_automigration: downgrade\n'
+
+    assert manager.db_migrations == ['0001_automigration']
+    assert manager.diff == ['0002_automigration']
+
+
+def test_downgrade_target(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    manager.revision()
+    manager.upgrade()
+    capsys.readouterr()
+
+    assert manager.db_migrations == ['0001_automigration', '0002_automigration']
+    assert manager.diff == []
+
+    manager.downgrade('0001')
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0002_automigration: downgrade\nINFO: 0001_automigration: downgrade\n'
+
+    assert manager.db_migrations == []
+    assert manager.diff == ['0001_automigration', '0002_automigration']
+
+
+def test_downgrade_not_applied(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    capsys.readouterr()
+
+    manager.downgrade('0001')
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0001_automigration: not yet applied\n'
+
+
+def test_downgrade_target_error(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    capsys.readouterr()
+
+    manager.downgrade('9999')
+    out, err = capsys.readouterr()
+    assert out == 'ERROR: could not find migration: 9999\n'
+
+
+def test_run_migration_not_found(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    capsys.readouterr()
+
+    manager.run_migration('9999')
+    out, err = capsys.readouterr()
+    assert out == 'ERROR: could not find migration: 9999\n'
+
+
+def test_run_migration_exception(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    capsys.readouterr()
+
+    # Open the migration file and write lines to it that will error when we try to run it.
+    with manager.open_migration('0001_automigration', 'w') as handle:
+        handle.write('def upgrade(migrator):\n    undefined\n')
+
+    manager.upgrade()
+    out, err = capsys.readouterr()
+    assert out == "INFO: 0001_automigration: upgrade\nERROR: name 'undefined' is not defined\n"
+
+
+def test_delete(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    manager.upgrade()
+    capsys.readouterr()
+
+    manager.delete('0001')
+    out, err = capsys.readouterr()
+    assert out == 'INFO: 0001_automigration: delete\n'
+
+    assert manager.db_migrations == []
+    assert manager.migration_files == []
+
+
+def test_delete_not_found(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+    manager.revision()
+    manager.upgrade()
+    capsys.readouterr()
+
+    manager.delete('9999')
+    out, err = capsys.readouterr()
+    assert out == 'ERROR: could not find migration: 9999\n'

@@ -301,18 +301,12 @@ class DatabaseManager:
         return True
 
     def run_migration(self, migration, direction='upgrade'):
-        """Run a single migration."""
+        """
+        Run a single migration.
+        Does not check to see if migration has already been applied!
+        """
         try:
             migration = self.find_migration(migration)
-
-            if direction == 'upgrade' and migration in self.db_migrations:
-                print('INFO:', '{}: already applied'.format(migration))
-                return False
-
-            if direction == 'downgrade' and migration not in self.db_migrations:
-                print('INFO:', '{}: not yet applied'.format(migration))
-                return False
-
         except ValueError as exc:
             print('ERROR:', exc)
             return False
@@ -502,8 +496,8 @@ class Migrator:
         field_class = FIELD_TO_PEEWEE.get(coltype, peewee.CharField)
         self.migrator.add_column(table, name, field_class(**kwargs)).run()
 
-    def drop_column(self, table, name, field, cascade=True):
-        self.migrator.drop_column(table, name, field, cascade=cascade).run()
+    def drop_column(self, table, name, cascade=True):
+        self.migrator.drop_column(table, name, cascade=cascade).run()
 
     def rename_column(self, table, old_name, new_name):
         self.migrator.rename_column(table, old_name, new_name).run()
