@@ -398,7 +398,7 @@ class DatabaseManager:
 
     def run_migration(self, migration, direction='upgrade'):
         """
-        Run a single migration. Does not check to see if migration has already been applied!
+        Run a single migration. Does not check to see if migration has already been applied.
 
         :param migration: Migration to run.
         :param: Direction to run (either 'upgrade' or 'downgrade') (default upgrade).
@@ -589,9 +589,10 @@ class TableCreator:
         This has some special cases, which is why it's not handled like all the other column types.
 
         :param name: Name of the foreign key.
-        :param references: Table name in the format of "table.column" or just "table" (and id will be default column).
-        :param kwargs: Additional kwargs to pass to the column instance. You can also provide "on_delete" and
-            "on_update" to add constraints.
+        :param references: Table name in the format of "table.column" or just
+            "table" (and id will be default column).
+        :param kwargs: Additional kwargs to pass to the column instance.
+            You can also provide "on_delete" and "on_update" to add constraints.
         :return: None
         """
         on_delete = kwargs.pop('on_delete', False)
@@ -706,7 +707,7 @@ class Migrator:
 
     def add_not_null(self, table, column):
         """
-        Add a NOT NULL constraint to a column
+        Add a NOT NULL constraint to a column.
 
         :param table: Table name.
         :param column: Column name.
@@ -716,7 +717,7 @@ class Migrator:
 
     def drop_not_null(self, table, column):
         """
-        Remove a NOT NULL constraint to a column
+        Remove a NOT NULL constraint to a column.
 
         :param table: Table name.
         :param column: Column name.
