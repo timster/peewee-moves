@@ -94,12 +94,26 @@ if FLASK_ENABLED:
 
 
 def build_downgrade_from_model(model):
-    """Build a list of 'downgrade' operations for a model class."""
+    """
+    Build a list of 'downgrade' operations for a model class.
+    Each value that is yieled is one operation.
+
+    :param model: Peewee model class or instance.
+    :return: generator
+    :rtype: str
+    """
     yield "migrator.drop_table('{}')".format(model._meta.db_table)
 
 
 def build_upgrade_from_model(model):
-    """Build a list of 'upgrade' operations for a model class."""
+    """
+    Build a list of 'upgrade' operations for a model class.
+    Each value that is yieled is one operation.
+
+    :param model: Peewee model class or instance.
+    :return: generator
+    :rtype: str
+    """
     yield "with migrator.create_table('{}') as table:".format(model._meta.db_table)
 
     for field in model._meta.sorted_fields:
@@ -146,6 +160,13 @@ class MigrationHistory(peewee.Model):
 
 class DatabaseManager:
     def __init__(self, database, table_name='migration_history', directory='migrations'):
+        """
+        Initialize a DatabaseManager with the given options.
+
+        :param database: Connection string, dict, or peewee.Database instance to use.
+        :param table_name: Table name to hold migrations (default migration_history).
+        :param directory: Directory to store migrations (default migrations).
+        """
         self.directory = str(directory)
         os.makedirs(self.directory, exist_ok=True)
         self.database = self.load_database(database)
@@ -156,7 +177,14 @@ class DatabaseManager:
         MigrationHistory.create_table(fail_silently=True)
 
     def load_database(self, database):
-        """Load the given database, whatever it might be."""
+        """
+        Load the given database, whatever it might be.
+
+        :param database: Connection string, dict, or peewee.Database instance to use.
+        :raises: peewee.DatabaseError if database connection cannot be established.
+        :return: Database connection.
+        :rtype: peewee.Database instance.
+        """
         if isinstance(database, peewee.Database):
             return database
 
@@ -177,22 +205,44 @@ class DatabaseManager:
 
     @property
     def migration_files(self):
-        """List all the migrations sitting on the filesystem."""
+        """
+        List all the migrations sitting on the filesystem.
+
+        :return: List of migration names.
+        :rtype: list
+        """
         files = (f[:-len('.py')] for f in os.listdir(self.directory) if f.endswith('.py'))
         return sorted(files)
 
     @property
     def db_migrations(self):
-        """List all the migrations applied to the database."""
+        """
+        List all the migrations applied to the database.
+
+        :return: List of migration names.
+        :rtype: list
+        """
         return sorted(row.name for row in MigrationHistory.select())
 
     @property
     def diff(self):
-        """List all the migrations that have not been applied to the database."""
+        """
+        List all the migrations that have not been applied to the database.
+
+        :return: List of migration names.
+        :rtype: list
+        """
         return sorted(set(self.migration_files) - set(self.db_migrations))
 
     def find_migration(self, value):
-        """Try to find a migration by name or start of name."""
+        """
+        Try to find a migration by name or start of name.
+
+        :raises: ValueError if no matching migration is found.
+        :return: Name of matching migration.
+        :rtype: str
+        """
+        value = str(value)
         for name in self.migration_files:
             if name == value:
                 return name
@@ -203,7 +253,10 @@ class DatabaseManager:
     def get_ident(self):
         """
         Return a unique identifier for a revision. Override this method to change functionality.
-        Make sure the IDs will be sortable (like timestamps or incremental numbers)
+        Make sure the IDs will be sortable (like timestamps or incremental numbers).
+
+        :return: Name of new migration.
+        :rtype: str
         """
         next_id = 1
         if self.migration_files:
@@ -211,19 +264,45 @@ class DatabaseManager:
         return '{:04}'.format(next_id)
 
     def next_migration(self, name):
-        """Get the name of the next migration that should be created."""
+        """
+        Get the name of the next migration that should be created.
+
+        :param name: Name to use for migration (not including identifier).
+        :return: Name of new migration.
+        :rtype: str
+        """
         return '{}_{}'.format(self.get_ident(), name.replace(' ', '_'))
 
     def get_filename(self, migration):
-        """Return the filename for the given migation."""
+        """
+        Return the full path and filename for the given migration.
+
+        :param migration: Name of migration to find (not including extension).
+        :return: Path and filename to migration.
+        :rtype: str
+        """
         return os.path.join(self.directory, '{}.py'.format(migration))
 
     def open_migration(self, migration, mode='r'):
-        """Open a migration file with the given mode and return it."""
+        """
+        Open a migration file with the given mode and return it.
+
+        :param migration: Name of migration to find (not including extension).
+        :param mode: Mode to pass to open(). Most likely 'r' or 'w'.
+        :raises: IOError if the file cannot be opened.
+        :return: File instance.
+        :rtype: io.FileIO
+        """
         return open(self.get_filename(migration), mode)
 
     def delete(self, migration):
-        """Delete the migration from filesystem and database. As if it never happened."""
+        """
+        Delete the migration from filesystem and database. As if it never happened.
+
+        :param migration: Name of migration to find (not including extension).
+        :return: True if delete was successful, otherwise False.
+        :type: bool
+        """
         try:
             migration = self.find_migration(migration)
             try:
@@ -242,7 +321,12 @@ class DatabaseManager:
         return True
 
     def status(self):
-        """Show all the migrations and a status for each."""
+        """
+        Show all the migrations and a status for each.
+
+        :return: True if listing was successful, otherwise None.
+        :type: bool
+        """
         if not self.migration_files:
             print('INFO:', 'no migrations found')
             return True
@@ -252,7 +336,13 @@ class DatabaseManager:
         return True
 
     def upgrade(self, target=None):
-        """Run all the migrations (up to target if specified). If no target, run all upgrades."""
+        """
+        Run all the migrations (up to target if specified). If no target, run all upgrades.
+
+        :param target: Migration target to limit upgrades.
+        :return: True if upgrade was successful, otherwise False.
+        :type: bool
+        """
         try:
             if target:
                 target = self.find_migration(target)
@@ -276,7 +366,13 @@ class DatabaseManager:
         return True
 
     def downgrade(self, target=None):
-        """Run all the migrations (down to target if specified). If no target, run one downgrade."""
+        """
+        Run all the migrations (down to target if specified). If no target, run one downgrade.
+
+        :param target: Migration target to limit downgrades.
+        :return: True if downgrade was successful, otherwise False.
+        :type: bool
+        """
         try:
             if target:
                 target = self.find_migration(target)
@@ -302,8 +398,12 @@ class DatabaseManager:
 
     def run_migration(self, migration, direction='upgrade'):
         """
-        Run a single migration.
-        Does not check to see if migration has already been applied!
+        Run a single migration. Does not check to see if migration has already been applied!
+
+        :param migration: Migration to run.
+        :param: Direction to run (either 'upgrade' or 'downgrade') (default upgrade).
+        :return: True if migration was run successfully, otherwise False.
+        :type: bool
         """
         try:
             migration = self.find_migration(migration)
@@ -334,7 +434,13 @@ class DatabaseManager:
         return True
 
     def revision(self, name=None):
-        """Create a single blank migration file with given name or default of 'automigration'."""
+        """
+        Create a single blank migration file with given name or default of 'automigration'.
+
+        :param name: Name of migration to create (default automigration).
+        :return: True if migration file was created, otherwise False.
+        :type: bool
+        """
         try:
             if name is None:
                 name = 'automigration'
@@ -359,6 +465,10 @@ class DatabaseManager:
         Create a new migration file for an existing model.
         Model could actually also be a module, in which case all Peewee models are extracted
         from the model and created.
+
+        :param modelstr: Python class, module, or string pointing to a class or module.
+        :return: True if migration file was created, otherwise False.
+        :type: bool
         """
         model = modelstr
         if isinstance(modelstr, str):
@@ -400,6 +510,11 @@ class DatabaseManager:
 
 class TableCreator:
     def __init__(self, name):
+        """
+        Initialize a new TableCreator instance.
+
+        :param name: Name of database table.
+        """
         self.name = name
         self.model = TableCreator.build_fake_model(self.name)
 
@@ -414,6 +529,10 @@ class TableCreator:
         """
         Build a fake model with some defaults and the given table name.
         We need this so we can perform operations that actually require a model class.
+
+        :param name: Name of database table.
+        :return: A new model class.
+        :rtype: peewee.Model
         """
         class Meta:
             primary_key = False
@@ -423,22 +542,41 @@ class TableCreator:
         return type('FakeModel', (peewee.Model,), {'Meta': Meta})
 
     def column(self, coltype, name, **kwargs):
-        """Generic method to add a column of any type."""
+        """
+        Generic method to add a column of any type.
+
+        :param coltype: Column type (from FIELD_TO_PEEWEE).
+        :param name: Name of column.
+        :param kwargs: Arguments for the given column type.
+        """
         field_class = FIELD_TO_PEEWEE.get(coltype, peewee.CharField)
         field_class(**kwargs).add_to_class(self.model, name)
 
     def add_index(self, columns, unique=False):
-        """Add an index to the model."""
+        """
+        Add an index to the model.
+
+        :param columns: Columns (list or tuple).
+        :param unique: True or False whether index should be unique (default False).
+        """
         self.model._meta.indexes.append((columns, unique))
 
     def add_constraint(self, value):
-        """Add a constraint to the model."""
+        """
+        Add a constraint to the model.
+
+        :param name: String value of constraint.
+        :return: None
+        """
         self.model._meta.constraints.append(peewee.SQL(value))
 
     def primary_key(self, name):
         """
         Add a primary key to the model.
         This has some special cases, which is why it's not handled like all the other column types.
+
+        :param name: Name of column.
+        :return: None
         """
         pkfield = peewee.PrimaryKeyField(primary_key=True)
         self.model._meta.primary_key = pkfield
@@ -449,6 +587,12 @@ class TableCreator:
         """
         Add a foreign key to the model.
         This has some special cases, which is why it's not handled like all the other column types.
+
+        :param name: Name of the foreign key.
+        :param references: Table name in the format of "table.column" or just "table" (and id will be default column).
+        :param kwargs: Additional kwargs to pass to the column instance. You can also provide "on_delete" and
+            "on_update" to add constraints.
+        :return: None
         """
         on_delete = kwargs.pop('on_delete', False)
         on_update = kwargs.pop('on_update', False)
@@ -470,11 +614,26 @@ class TableCreator:
 
 class Migrator:
     def __init__(self, database):
+        """
+        Initialize a new Migrator instance for the given database.
+
+        :param database: Connection string, dict, or peewee.Database instance to use.
+        :return:
+        """
         self.database = database
         self.migrator = SchemaMigrator.from_database(self.database)
 
     @contextmanager
     def create_table(self, name, safe=False):
+        """
+        Context manager to create the given table.
+        Yield a TableCreator instance on which you can perform operations and add columns.
+
+        :param name: Name of table to created
+        :param safe: If True, will be created with "IF NOT EXISTS" (default False).
+        :return: generator
+        :rtype: TableCreator
+        """
         table = TableCreator(name)
 
         yield table
@@ -489,33 +648,110 @@ class Migrator:
                 self.database.create_index(table.model, fields, unique)
 
     def drop_table(self, name, safe=False, cascade=False):
+        """
+        Drop the table.
+
+        :param name: Table name to drop.
+        :param safe: If True, exception will be raised if table does not exist.
+        :param cascade: If True, drop will be cascaded.
+        :return: None
+        """
         model = TableCreator.build_fake_model(name)
         self.database.drop_table(model, fail_silently=safe, cascade=cascade)
 
     def add_column(self, table, name, coltype, **kwargs):
+        """
+        Add the given column to the given table.
+
+        :param table: Table name to add column to.
+        :param name: Name of the column field to add.
+        :param coltype: Column type (from FIELD_TO_PEEWEE).
+        :param kwargs: Arguments for the given column type.
+        :return: None
+        """
         field_class = FIELD_TO_PEEWEE.get(coltype, peewee.CharField)
         self.migrator.add_column(table, name, field_class(**kwargs)).run()
 
     def drop_column(self, table, name, cascade=True):
+        """
+        Drop the column from the given table.
+
+        :param table: Table name to drop column from.
+        :param name: Name of the column field to drop.
+        :param cascade: If True, drop will be cascaded.
+        :return: None
+        """
         self.migrator.drop_column(table, name, cascade=cascade).run()
 
     def rename_column(self, table, old_name, new_name):
+        """
+        Rename a column leaving everything else in tact.
+
+        :param table: Table name to rename column from.
+        :param old_name: Old column name.
+        :param new_name: New column name.
+        :return: None
+        """
         self.migrator.rename_column(table, old_name, new_name).run()
 
     def rename_table(self, old_name, new_name):
+        """
+        Rename a table leaving everything else in tact.
+
+        :param old_name: Old table name.
+        :param new_name: New table name.
+        :return: None
+        """
         self.migrator.rename_table(old_name, new_name).run()
 
     def add_not_null(self, table, column):
+        """
+        Add a NOT NULL constraint to a column
+
+        :param table: Table name.
+        :param column: Column name.
+        :return: None
+        """
         self.migrator.add_not_null(table, column).run()
 
     def drop_not_null(self, table, column):
+        """
+        Remove a NOT NULL constraint to a column
+
+        :param table: Table name.
+        :param column: Column name.
+        :return: None
+        """
         self.migrator.drop_not_null(table, column).run()
 
     def add_index(self, table, columns, unique=False):
+        """
+        Add an index to a table based on columns.
+
+        :param table: Table name.
+        :param columns: Columns (list or tuple).
+        :param unique: True or False whether index should be unique (default False).
+        :return: None
+        """
         self.migrator.add_index(table, columns, unique=unique).run()
 
     def drop_index(self, table, index_name):
+        """
+        Remove an index from a table.
+
+        :param table: Table name.
+        :param index_name: Index name.
+        :return: None
+        """
         self.migrator.drop_index(table, index_name).run()
 
     def execute_sql(self, sql, params=None):
+        """
+        Run the given sql and return a cursor.
+
+        :param sql: SQL string.
+        :param params: Parameters for the given SQL (deafult None).
+        :return: SQL cursor
+        :rtype: cursor
+        """
         return self.database.execute_sql(sql, params=params, require_commit=False)
