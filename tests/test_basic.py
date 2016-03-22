@@ -1,3 +1,5 @@
+import os
+
 import pytest
 import peewee
 
@@ -32,6 +34,14 @@ def test_database_creation_error(tmpdir):
         DatabaseManager(db, directory=tmpdir)
 
 
+def test_info(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+
+    manager.info()
+    out, err = capsys.readouterr()
+    assert out == 'INFO: Driver: SqliteDatabase\nINFO: Database: :memory:\n'
+
+
 def test_revision(tmpdir, capsys):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
@@ -42,6 +52,15 @@ def test_revision(tmpdir, capsys):
     manager.revision('Custom Name')
     out, err = capsys.readouterr()
     assert out == 'INFO: 0002_custom_name: created\n'
+
+
+def test_revision_bad_filename(tmpdir, capsys):
+    # should not be able to create revision in this dir
+    manager = DatabaseManager('sqlite:///:memory:', directory='/')
+
+    manager.revision('`')
+    out, err = capsys.readouterr()
+    assert 'Permission denied' in out
 
 
 def test_find_migration(tmpdir):

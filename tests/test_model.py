@@ -19,6 +19,13 @@ def test_create_migration(tmpdir, capsys):
     assert out == 'INFO: created migration 0001_create_table_person\n'
 
 
+def test_create_migration_bad_filename(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory='/')
+    manager.create(models.Person)
+    out, err = capsys.readouterr()
+    assert 'Permission denied' in out
+
+
 def test_create_migration_module(tmpdir, capsys):
     manager = DatabaseManager(models.database, directory=tmpdir)
     manager.create(models)

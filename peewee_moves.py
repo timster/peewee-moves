@@ -74,6 +74,11 @@ if FLASK_ENABLED:
 
     @migration_manager.command
     def status():
+        """Show information about the database."""
+        get_database_manager().status()
+
+    @migration_manager.command
+    def info():
         """Show all migrations and the status of each."""
         get_database_manager().status()
 
@@ -295,6 +300,19 @@ class DatabaseManager:
         """
         return open(self.get_filename(migration), mode)
 
+    def info(self):
+        """
+        Show the current database.
+        Don't include any sensitive information like passwords.
+
+        :return: String representation.
+        :rtype: str
+        """
+        driver = self.database.__class__.__name__
+        database = self.database.database
+        print('INFO:', 'Driver:', driver)
+        print('INFO:', 'Database:', database)
+
     def delete(self, migration):
         """
         Delete the migration from filesystem and database. As if it never happened.
@@ -305,10 +323,7 @@ class DatabaseManager:
         """
         try:
             migration = self.find_migration(migration)
-            try:
-                os.remove(self.get_filename(migration))
-            except OSError:
-                pass
+            os.remove(self.get_filename(migration))
             with self.database.transaction():
                 cmd = MigrationHistory.delete().where(MigrationHistory.name == migration)
                 cmd.execute()
