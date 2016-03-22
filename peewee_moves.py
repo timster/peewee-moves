@@ -461,8 +461,6 @@ class DatabaseManager:
                 name = 'automigration'
             name = str(name).lower()
             migration = self.next_migration(name)
-            print('INFO:', '{}: created'.format(migration))
-
             with self.open_migration(migration, 'w') as handle:
                 handle.write(TEMPLATE.format(
                     name=name,
@@ -473,6 +471,7 @@ class DatabaseManager:
             print('ERROR:', exc)
             return False
 
+        print('INFO:', '{}: created'.format(migration))
         return True
 
     def create(self, modelstr):
@@ -519,7 +518,7 @@ class DatabaseManager:
             print('ERROR:', exc)
             return False
 
-        print('INFO:', 'created migration {}'.format(migration))
+        print('INFO:', '{}: created'.format(migration))
         return True
 
 

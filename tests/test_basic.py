@@ -58,9 +58,9 @@ def test_revision_bad_filename(tmpdir, capsys):
     # should not be able to create revision in this dir
     manager = DatabaseManager('sqlite:///:memory:', directory='/')
 
-    manager.revision('`')
+    manager.revision('filename')
     out, err = capsys.readouterr()
-    assert 'Permission denied' in out
+    assert out.startswith('ERROR: [Errno 1')
 
 
 def test_find_migration(tmpdir):

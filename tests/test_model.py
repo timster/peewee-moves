@@ -16,24 +16,24 @@ def test_create_migration(tmpdir, capsys):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.create(models.Person)
     out, err = capsys.readouterr()
-    assert out == 'INFO: created migration 0001_create_table_person\n'
+    assert out == 'INFO: 0001_create_table_person: created\n'
 
 
 def test_create_migration_bad_filename(tmpdir, capsys):
     manager = DatabaseManager('sqlite:///:memory:', directory='/')
     manager.create(models.Person)
     out, err = capsys.readouterr()
-    assert 'Permission denied' in out
+    assert out.startswith('ERROR: [Errno 1')
 
 
 def test_create_migration_module(tmpdir, capsys):
     manager = DatabaseManager(models.database, directory=tmpdir)
     manager.create(models)
     out, err = capsys.readouterr()
-    assert 'INFO: created migration 0001_create_table_basicfields' in out
-    assert 'INFO: created migration 0002_create_table_organization' in out
-    assert 'INFO: created migration 0003_create_table_complexperson' in out
-    assert 'INFO: created migration 0004_create_table_person' in out
+    assert 'INFO: 0001_create_table_basicfields: created' in out
+    assert 'INFO: 0002_create_table_organization: created' in out
+    assert 'INFO: 0003_create_table_complexperson: created' in out
+    assert 'INFO: 0004_create_table_person: created' in out
 
 
 def test_build_upgrade_from_model():
