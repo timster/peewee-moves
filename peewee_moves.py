@@ -24,6 +24,7 @@ FIELD_TO_PEEWEE = {
     'binary': peewee.BinaryField,
     'blob': peewee.BlobField,
     'bool': peewee.BooleanField,
+    'char': peewee.CharField,
     'date': peewee.DateField,
     'datetime': peewee.DateTimeField,
     'decimal': peewee.DecimalField,
@@ -31,7 +32,6 @@ FIELD_TO_PEEWEE = {
     'fixed': peewee.FixedCharField,
     'float': peewee.FloatField,
     'integer': peewee.IntegerField,
-    'char': peewee.CharField,
     'text': peewee.TextField,
     'time': peewee.TimeField,
     'uuid': peewee.UUIDField,
@@ -131,7 +131,7 @@ def build_upgrade_from_model(model):
 
         # Flatten the keyword arguments for the field.
         args_list = ["'{}'".format(field.db_column)]
-        for key, value in kwargs.items():
+        for key, value in sorted(kwargs.items()):
             if isinstance(value, str):
                 value = "'{}'".format(value)
             args_list.append('{}={}'.format(key, value))

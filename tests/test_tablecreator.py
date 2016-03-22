@@ -1,4 +1,3 @@
-import pytest
 import peewee
 
 from peewee_moves import TableCreator
@@ -13,10 +12,10 @@ def test_initialize():
 def test_column():
     tc = TableCreator('awesome')
     tc.primary_key('id')
-    tc.column('char', 'name')
+    tc.column('str', 'name')
 
     assert isinstance(tc.model.id, peewee.PrimaryKeyField)
-    assert isinstance(tc.model.name, peewee.Field)
+    assert isinstance(tc.model.name, peewee.CharField)
 
 
 def test_index():

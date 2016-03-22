@@ -28,3 +28,16 @@ class Person(peewee.Model):
 
     class Meta:
         database = database
+
+
+class ComplexPerson(peewee.Model):
+    name = peewee.CharField(null=False, max_length=5, unique=True)
+
+    organization = peewee.ForeignKeyField(Organization)
+
+    class Meta:
+        database = database
+        constraints = (
+            'const1 fake',
+            'const2 fake',
+        )
