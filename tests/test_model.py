@@ -20,7 +20,7 @@ def test_create_migration(tmpdir, capsys):
 
 
 def test_create_migration_bad_filename(tmpdir, capsys):
-    manager = DatabaseManager('sqlite:///:memory:', directory='/')
+    manager = DatabaseManager('sqlite:///:memory:', directory='/invalid')
     manager.create(models.Person)
     out, err = capsys.readouterr()
     assert out.startswith('ERROR: [Errno 1')

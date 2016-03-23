@@ -56,7 +56,7 @@ def test_revision(tmpdir, capsys):
 
 def test_revision_bad_filename(tmpdir, capsys):
     # should not be able to create revision in this dir
-    manager = DatabaseManager('sqlite:///:memory:', directory='/')
+    manager = DatabaseManager('sqlite:///:memory:', directory='/invalid')
 
     manager.revision('filename')
     out, err = capsys.readouterr()
