@@ -19,13 +19,6 @@ def test_create_migration(tmpdir, capsys):
     assert out == 'INFO: 0001_create_table_person: created\n'
 
 
-def test_create_migration_bad_filename(tmpdir, capsys):
-    manager = DatabaseManager('sqlite:///:memory:', directory='/invalid')
-    manager.create(models.Person)
-    out, err = capsys.readouterr()
-    assert out.startswith('ERROR: [Errno 1')
-
-
 def test_create_migration_module(tmpdir, capsys):
     manager = DatabaseManager(models.database, directory=tmpdir)
     manager.create(models)

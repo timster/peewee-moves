@@ -54,15 +54,6 @@ def test_revision(tmpdir, capsys):
     assert out == 'INFO: 0002_custom_name: created\n'
 
 
-def test_revision_bad_filename(tmpdir, capsys):
-    # should not be able to create revision in this dir
-    manager = DatabaseManager('sqlite:///:memory:', directory='/invalid')
-
-    manager.revision('filename')
-    out, err = capsys.readouterr()
-    assert out.startswith('ERROR: [Errno 1')
-
-
 def test_find_migration(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
