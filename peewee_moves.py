@@ -21,7 +21,7 @@ __all__ = ['migration_manager', 'MigrationHistory', 'DatabaseManager', 'TableCre
 FIELD_TO_PEEWEE = {
     'bare': peewee.BareField,
     'biginteger': peewee.BigIntegerField,
-    'binary': peewee.BinaryField,
+    'binary': peewee.BlobField,
     'blob': peewee.BlobField,
     'bool': peewee.BooleanField,
     'char': peewee.CharField,
@@ -32,6 +32,9 @@ FIELD_TO_PEEWEE = {
     'fixed': peewee.FixedCharField,
     'float': peewee.FloatField,
     'integer': peewee.IntegerField,
+    'int': peewee.IntegerField,
+    'smallinteger': peewee.SmallIntegerField,
+    'smallint': peewee.SmallIntegerField,
     'text': peewee.TextField,
     'time': peewee.TimeField,
     'uuid': peewee.UUIDField,
@@ -493,9 +496,12 @@ class DatabaseManager:
 
         # If it's a module, we need to loop through all the models in it.
         if inspect.ismodule(model):
+            print('model was module')
             model_list = []
             for item in model.__dict__.values():
                 if inspect.isclass(item) and issubclass(item, peewee.Model):
+                    if getattr(item, '__abstract__', False):
+                        continue
                     model_list.append(item)
             for model in peewee.sort_models_topologically(model_list):
                 self.create(model)
