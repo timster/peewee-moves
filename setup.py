@@ -7,6 +7,10 @@ root_dir = path.abspath(path.dirname(__file__))
 with open(path.join(root_dir, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
+with open(path.join(root_dir, 'requirements.txt'), encoding='utf-8') as f:
+    install_requires = list(map(str.strip, f.readlines()))
+
+
 setup(
     name='peewee-moves',
     version='0.3.0',
@@ -38,5 +42,5 @@ setup(
 
     py_modules=['peewee_moves'],
 
-    install_requires=['peewee>=2.8.0'],
+    install_requires=install_requires,
 )
