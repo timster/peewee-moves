@@ -39,7 +39,7 @@ def test_info(tmpdir, capsys):
 
     manager.info()
     out, err = capsys.readouterr()
-    assert out == 'INFO: Driver: SqliteDatabase\nINFO: Database: :memory:\n'
+    assert out == 'INFO: driver = SqliteDatabase\nINFO: database = :memory:\n'
 
 
 def test_revision(tmpdir, capsys):
@@ -47,7 +47,7 @@ def test_revision(tmpdir, capsys):
 
     manager.revision()
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: created\n'
+    assert out == 'INFO: 0001_auto_migration: created\n'
 
     manager.revision('Custom Name')
     out, err = capsys.readouterr()
@@ -59,10 +59,10 @@ def test_find_migration(tmpdir):
     manager.revision()
 
     rv = manager.find_migration('0001')
-    assert rv == '0001_automigration'
+    assert rv == '0001_auto_migration'
 
-    rv = manager.find_migration('0001_automigration')
-    assert rv == '0001_automigration'
+    rv = manager.find_migration('0001_auto_migration')
+    assert rv == '0001_auto_migration'
 
     with pytest.raises(ValueError):
         manager.find_migration('does_not_exist')
@@ -72,10 +72,10 @@ def test_open_migration(tmpdir, capsys):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
 
-    with manager.open_migration('0001_automigration') as handle:
+    with manager.open_migration('0001_auto_migration') as handle:
         content = handle.read()
 
-    assert content.startswith('"""\nautomigration')
+    assert content.startswith('"""\nauto migration')
     assert 'def upgrade(migrator):\n    pass' in content
     assert 'def downgrade(migrator):\n    pass' in content
 
@@ -89,11 +89,11 @@ def test_status(tmpdir, capsys):
 
     manager.revision()
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: created\n'
+    assert out == 'INFO: 0001_auto_migration: created\n'
 
     manager.status()
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: pending\n'
+    assert out == 'INFO: 0001_auto_migration: pending\n'
 
 
 def test_files_and_diff(tmpdir):
@@ -105,10 +105,10 @@ def test_files_and_diff(tmpdir):
     assert rv == []
 
     rv = manager.migration_files
-    assert rv == ['0001_automigration', '0002_custom_name']
+    assert rv == ['0001_auto_migration', '0002_custom_name']
 
     rv = manager.diff
-    assert rv == ['0001_automigration', '0002_custom_name']
+    assert rv == ['0001_auto_migration', '0002_custom_name']
 
 
 def test_upgrade_all(tmpdir, capsys):
@@ -119,9 +119,9 @@ def test_upgrade_all(tmpdir, capsys):
 
     manager.upgrade()
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: upgrade\nINFO: 0002_automigration: upgrade\n'
+    assert out == 'INFO: 0001_auto_migration: upgrade\nINFO: 0002_auto_migration: upgrade\n'
 
-    assert manager.db_migrations == ['0001_automigration', '0002_automigration']
+    assert manager.db_migrations == ['0001_auto_migration', '0002_auto_migration']
     assert manager.diff == []
 
     # All migrations applied now...
@@ -138,10 +138,10 @@ def test_upgrade_target(tmpdir, capsys):
 
     manager.upgrade('0001')
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: upgrade\n'
+    assert out == 'INFO: 0001_auto_migration: upgrade\n'
 
-    assert manager.db_migrations == ['0001_automigration']
-    assert manager.diff == ['0002_automigration']
+    assert manager.db_migrations == ['0001_auto_migration']
+    assert manager.diff == ['0002_auto_migration']
 
 
 def test_already_upgraded(tmpdir, capsys):
@@ -151,11 +151,11 @@ def test_already_upgraded(tmpdir, capsys):
 
     manager.upgrade('0001')
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: upgrade\n'
+    assert out == 'INFO: 0001_auto_migration: upgrade\n'
 
     manager.upgrade('0001')
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: already applied\n'
+    assert out == 'INFO: 0001_auto_migration: already applied\n'
 
 
 def test_upgrade_target_error(tmpdir, capsys):
@@ -182,15 +182,15 @@ def test_downgrade_single(tmpdir, capsys):
     manager.upgrade()
     capsys.readouterr()
 
-    assert manager.db_migrations == ['0001_automigration', '0002_automigration']
+    assert manager.db_migrations == ['0001_auto_migration', '0002_auto_migration']
     assert manager.diff == []
 
     manager.downgrade()
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0002_automigration: downgrade\n'
+    assert out == 'INFO: 0002_auto_migration: downgrade\n'
 
-    assert manager.db_migrations == ['0001_automigration']
-    assert manager.diff == ['0002_automigration']
+    assert manager.db_migrations == ['0001_auto_migration']
+    assert manager.diff == ['0002_auto_migration']
 
 
 def test_downgrade_target(tmpdir, capsys):
@@ -200,15 +200,15 @@ def test_downgrade_target(tmpdir, capsys):
     manager.upgrade()
     capsys.readouterr()
 
-    assert manager.db_migrations == ['0001_automigration', '0002_automigration']
+    assert manager.db_migrations == ['0001_auto_migration', '0002_auto_migration']
     assert manager.diff == []
 
     manager.downgrade('0001')
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0002_automigration: downgrade\nINFO: 0001_automigration: downgrade\n'
+    assert out == 'INFO: 0002_auto_migration: downgrade\nINFO: 0001_auto_migration: downgrade\n'
 
     assert manager.db_migrations == []
-    assert manager.diff == ['0001_automigration', '0002_automigration']
+    assert manager.diff == ['0001_auto_migration', '0002_auto_migration']
 
 
 def test_downgrade_not_applied(tmpdir, capsys):
@@ -218,7 +218,7 @@ def test_downgrade_not_applied(tmpdir, capsys):
 
     manager.downgrade('0001')
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: not yet applied\n'
+    assert out == 'INFO: 0001_auto_migration: not yet applied\n'
 
 
 def test_downgrade_target_error(tmpdir, capsys):
@@ -247,12 +247,12 @@ def test_run_migration_exception(tmpdir, capsys):
     capsys.readouterr()
 
     # Open the migration file and write lines to it that will error when we try to run it.
-    with manager.open_migration('0001_automigration', 'w') as handle:
+    with manager.open_migration('0001_auto_migration', 'w') as handle:
         handle.write('def upgrade(migrator):\n    undefined\n')
 
     manager.upgrade()
     out, err = capsys.readouterr()
-    assert "INFO: 0001_automigration: upgrade" in out
+    assert "INFO: 0001_auto_migration: upgrade" in out
     assert "'undefined' is not defined" in out
 
 
@@ -264,7 +264,7 @@ def test_delete(tmpdir, capsys):
 
     manager.delete('0001')
     out, err = capsys.readouterr()
-    assert out == 'INFO: 0001_automigration: delete\n'
+    assert out == 'INFO: 0001_auto_migration: delete\n'
 
     assert manager.db_migrations == []
     assert manager.migration_files == []

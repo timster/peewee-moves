@@ -237,44 +237,37 @@ if needed.
 Flask Usage
 ===========
 
-This package includes an interface to Flask-Script which provides an easy-to-use command line
-interface.
+This package includes an interface to Flask versions 0.11 or later using Click which provides an
+easy-to-use command line interface.
 
-To set up, you first need to make sure you have DATABASE defiend in your configuration:
+If you are using Flask 0.10, you can use backported integration via Flask-CLI.
 
-.. code:: python
+Flask-Moves will automatically add the command to the cli if it detects that Click is available.
 
-    DATABASE = {
-        'name': '/path/database.sqlite',
-        'engine': 'peewee.SqliteDatabase',
-    }
+.. code:: console
 
-Then in `manage.py` (or wherever you have Flask-Script setup) you can import the database manager
-and mount it as a sub-command:
-
-.. code:: python
-
-    from flask_script import Manager
-
-    from peewee_moves import migration_manager
-
-    manager = Manager(app)
-    manager.add_command('db', migration_manager)
+    flask db --help
 
 This gives you the following command line interface:
 
 .. code:: console
 
-    $ ./manage.py db
-    usage: ./manage.py db [command]
+    $ flask db --help
+    Usage: flask db [OPTIONS] COMMAND [ARGS]...
 
-    positional arguments:
-        create       Create a migration based on an existing model.
-        delete       Delete the target migration from the filesystem and database.
-        downgrade    Run database downgrades.
-        revision     Create a blank migration file.
-        status       Show all migrations and the status of each.
-        upgrade      Run database upgrades.
+      Run Peewee migration commands.
+
+    Options:
+      --help  Show this message and exit.
+
+    Commands:
+      create     Create a migration based on an existing...
+      delete     Delete the target migration from the...
+      downgrade  Run database downgrades.
+      info       Show information about the current database.
+      revision   Create a blank migration file.
+      status     Show information about the database.
+      upgrade    Run database upgrades.
 
 This should look very similar since it uses the same commands we just looked at!
 
@@ -282,12 +275,12 @@ For example, to create the migration for User model would look like this:
 
 .. code:: console
 
-    $ ./manage.py db create -m models.User
+    $ flask db create models.User
     INFO: 0003_create_table_user: created
 
 And to create a blank migration with a custom name would look like this:
 
 .. code:: console
 
-    $ ./manage.py db revision -n "custom name"
-    INFO: 0004_custom_name: created
+    $ flask db revision "custom revision"
+    INFO: 0004_custom_revision: created

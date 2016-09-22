@@ -10,13 +10,12 @@ from playhouse.migrate import SchemaMigrator
 import peewee
 
 try:
-    FLASK_ENABLED = True
+    import click
+    from flask import cli
     from flask import current_app
-    from flask_script import Manager
+    EXTENSION_CLICK = True
 except ImportError:
-    FLASK_ENABLED = False
-
-__all__ = ['migration_manager', 'MigrationHistory', 'DatabaseManager', 'TableCreator', 'Migrator']
+    EXTENSION_CLICK = False
 
 FIELD_TO_PEEWEE = {
     'bare': peewee.BareField,
@@ -32,7 +31,6 @@ FIELD_TO_PEEWEE = {
     'fixed': peewee.FixedCharField,
     'float': peewee.FloatField,
     'int': peewee.IntegerField,
-    'int': peewee.TimestampField,
     'integer': peewee.IntegerField,
     'smallint': peewee.SmallIntegerField,
     'smallinteger': peewee.SmallIntegerField,
@@ -44,6 +42,7 @@ FIELD_TO_PEEWEE = {
 PEEWEE_TO_FIELD = {value: key for key, value in FIELD_TO_PEEWEE.items()}
 PEEWEE_TO_FIELD[peewee.PrimaryKeyField] = 'primary_key'
 PEEWEE_TO_FIELD[peewee.ForeignKeyField] = 'foreign_key'
+PEEWEE_TO_FIELD[peewee.TimestampField] = 'int'
 
 FIELD_KWARGS = (
     'null', 'index', 'unique', 'constraints', 'sequence',
@@ -56,50 +55,6 @@ TEMPLATE = (
     'def downgrade(migrator):\n    {downgrade}\n'
 )
 TEMPLATE = str.join('', TEMPLATE)
-
-
-if FLASK_ENABLED:
-
-    migration_manager = Manager(usage='{} db [command]'.format(sys.argv[0]))
-
-    def get_database_manager():
-        """Return a DatabaseManager for the current Flask application."""
-        return DatabaseManager(current_app.config['DATABASE'], directory='app/migrations')
-
-    @migration_manager.option('-m', '--model', dest='model', required=False)
-    def create(model):
-        """Create a migration based on an existing model."""
-        get_database_manager().create(model)
-
-    @migration_manager.option('-n', '--name', dest='name', required=False)
-    def revision(name):
-        """Create a blank migration file."""
-        get_database_manager().revision(name)
-
-    @migration_manager.command
-    def status():
-        """Show information about the database."""
-        get_database_manager().status()
-
-    @migration_manager.command
-    def info():
-        """Show all migrations and the status of each."""
-        get_database_manager().status()
-
-    @migration_manager.option('-t', '--target', dest='target', required=False)
-    def upgrade(target):
-        """Run database upgrades."""
-        get_database_manager().upgrade(target)
-
-    @migration_manager.option('-t', '--target', dest='target', required=False)
-    def downgrade(target):
-        """Run database downgrades."""
-        get_database_manager().downgrade(target)
-
-    @migration_manager.option('-t', '--target', dest='target', required=True)
-    def delete(target):
-        """Delete the target migration from the filesystem and database."""
-        get_database_manager().delete(target)
 
 
 def build_downgrade_from_model(model):
@@ -165,368 +120,6 @@ class MigrationHistory(peewee.Model):
 
     class Meta:
         db_table = 'migration_history'
-
-
-class DatabaseManager:
-    def __init__(self, database, table_name='migration_history', directory='migrations'):
-        """
-        Initialize a DatabaseManager with the given options.
-
-        :param database: Connection string, dict, or peewee.Database instance to use.
-        :param table_name: Table name to hold migrations (default migration_history).
-        :param directory: Directory to store migrations (default migrations).
-        """
-        self.directory = str(directory)
-        os.makedirs(self.directory, exist_ok=True)
-        self.database = self.load_database(database)
-        self.migrator = Migrator(self.database)
-
-        MigrationHistory._meta.database = self.database
-        MigrationHistory._meta.db_table = table_name
-        MigrationHistory.create_table(fail_silently=True)
-
-    def load_database(self, database):
-        """
-        Load the given database, whatever it might be.
-
-        :param database: Connection string, dict, or peewee.Database instance to use.
-        :raises: peewee.DatabaseError if database connection cannot be established.
-        :return: Database connection.
-        :rtype: peewee.Database instance.
-        """
-        if isinstance(database, peewee.Database):
-            return database
-
-        if isinstance(database, dict):
-            try:
-                name = database.pop('name')
-                engine = database.pop('engine')
-            except KeyError:
-                error_msg = 'Configuration dict must specify "name" and "engine" keys.'
-                raise peewee.DatabaseError(error_msg)
-
-            db_class = pydoc.locate(engine)
-            if not db_class:
-                raise peewee.DatabaseError('Unable to import engine class: {}'.format(engine))
-            return db_class(name, **database)
-
-        return db_url_connect(database)
-
-    @property
-    def migration_files(self):
-        """
-        List all the migrations sitting on the filesystem.
-
-        :return: List of migration names.
-        :rtype: list
-        """
-        files = (f[:-len('.py')] for f in os.listdir(self.directory) if f.endswith('.py'))
-        return sorted(files)
-
-    @property
-    def db_migrations(self):
-        """
-        List all the migrations applied to the database.
-
-        :return: List of migration names.
-        :rtype: list
-        """
-        return sorted(row.name for row in MigrationHistory.select())
-
-    @property
-    def diff(self):
-        """
-        List all the migrations that have not been applied to the database.
-
-        :return: List of migration names.
-        :rtype: list
-        """
-        return sorted(set(self.migration_files) - set(self.db_migrations))
-
-    def find_migration(self, value):
-        """
-        Try to find a migration by name or start of name.
-
-        :raises: ValueError if no matching migration is found.
-        :return: Name of matching migration.
-        :rtype: str
-        """
-        value = str(value)
-        for name in self.migration_files:
-            if name == value:
-                return name
-            if name.startswith('{}_'.format(value)):
-                return name
-        raise ValueError('could not find migration: {}'.format(value))
-
-    def get_ident(self):
-        """
-        Return a unique identifier for a revision. Override this method to change functionality.
-        Make sure the IDs will be sortable (like timestamps or incremental numbers).
-
-        :return: Name of new migration.
-        :rtype: str
-        """
-        next_id = 1
-        if self.migration_files:
-            next_id = int(list(self.migration_files)[-1].split('_')[0]) + 1
-        return '{:04}'.format(next_id)
-
-    def next_migration(self, name):
-        """
-        Get the name of the next migration that should be created.
-
-        :param name: Name to use for migration (not including identifier).
-        :return: Name of new migration.
-        :rtype: str
-        """
-        return '{}_{}'.format(self.get_ident(), name.replace(' ', '_'))
-
-    def get_filename(self, migration):
-        """
-        Return the full path and filename for the given migration.
-
-        :param migration: Name of migration to find (not including extension).
-        :return: Path and filename to migration.
-        :rtype: str
-        """
-        return os.path.join(self.directory, '{}.py'.format(migration))
-
-    def open_migration(self, migration, mode='r'):
-        """
-        Open a migration file with the given mode and return it.
-
-        :param migration: Name of migration to find (not including extension).
-        :param mode: Mode to pass to open(). Most likely 'r' or 'w'.
-        :raises: IOError if the file cannot be opened.
-        :return: File instance.
-        :rtype: io.FileIO
-        """
-        return open(self.get_filename(migration), mode)
-
-    def info(self):
-        """
-        Show the current database.
-        Don't include any sensitive information like passwords.
-
-        :return: String representation.
-        :rtype: str
-        """
-        driver = self.database.__class__.__name__
-        database = self.database.database
-        print('INFO:', 'Driver:', driver)
-        print('INFO:', 'Database:', database)
-
-    def delete(self, migration):
-        """
-        Delete the migration from filesystem and database. As if it never happened.
-
-        :param migration: Name of migration to find (not including extension).
-        :return: True if delete was successful, otherwise False.
-        :type: bool
-        """
-        try:
-            migration = self.find_migration(migration)
-            os.remove(self.get_filename(migration))
-            with self.database.transaction():
-                cmd = MigrationHistory.delete().where(MigrationHistory.name == migration)
-                cmd.execute()
-        except Exception as exc:
-            self.database.rollback()
-            print('ERROR:', exc)
-            return False
-
-        print('INFO:', '{}: delete'.format(migration))
-        return True
-
-    def status(self):
-        """
-        Show all the migrations and a status for each.
-
-        :return: True if listing was successful, otherwise None.
-        :type: bool
-        """
-        if not self.migration_files:
-            print('INFO:', 'no migrations found')
-            return True
-        for name in self.migration_files:
-            status = 'applied' if name in self.db_migrations else 'pending'
-            print('INFO:', '{}: {}'.format(name, status))
-        return True
-
-    def upgrade(self, target=None):
-        """
-        Run all the migrations (up to target if specified). If no target, run all upgrades.
-
-        :param target: Migration target to limit upgrades.
-        :return: True if upgrade was successful, otherwise False.
-        :type: bool
-        """
-        try:
-            if target:
-                target = self.find_migration(target)
-                if target in self.db_migrations:
-                    print('INFO:', '{}: already applied'.format(target))
-                    return False
-        except ValueError as exc:
-            print('ERROR:', exc)
-            return False
-
-        if self.diff:
-            for name in self.diff:
-                rv = self.run_migration(name, 'upgrade')
-                # If it didn't work, don't try any more.
-                # Or if we are at the end of the line, don't run anymore.
-                if not rv or (target and target == name):
-                    break
-            return True
-
-        print('INFO:', 'all migrations applied!')
-        return True
-
-    def downgrade(self, target=None):
-        """
-        Run all the migrations (down to target if specified). If no target, run one downgrade.
-
-        :param target: Migration target to limit downgrades.
-        :return: True if downgrade was successful, otherwise False.
-        :type: bool
-        """
-        try:
-            if target:
-                target = self.find_migration(target)
-                if target not in self.db_migrations:
-                    print('INFO:', '{}: not yet applied'.format(target))
-                    return False
-        except ValueError as exc:
-            print('ERROR:', exc)
-            return False
-
-        diff = self.db_migrations[::-1]
-        if diff:
-            for name in diff:
-                rv = self.run_migration(name, 'downgrade')
-                # If it didn't work, don't try any more.
-                # Or if we are at the end of the line, don't run anymore.
-                if not rv or (not target or target == name):
-                    break
-            return True
-
-        print('INFO:', 'migrations not yet applied!')
-        return True
-
-    def run_migration(self, migration, direction='upgrade'):
-        """
-        Run a single migration. Does not check to see if migration has already been applied.
-
-        :param migration: Migration to run.
-        :param: Direction to run (either 'upgrade' or 'downgrade') (default upgrade).
-        :return: True if migration was run successfully, otherwise False.
-        :type: bool
-        """
-        try:
-            migration = self.find_migration(migration)
-        except ValueError as exc:
-            print('ERROR:', exc)
-            return False
-
-        try:
-            print('INFO:', '{}: {}'.format(migration, direction))
-            with self.database.transaction():
-                scope = {}
-                with self.open_migration(migration, 'r') as handle:
-                    exec(handle.read(), scope)
-
-                method = scope.get(direction, lambda migrator: None)
-                method(self.migrator)
-
-                if direction == 'upgrade':
-                    MigrationHistory.create(name=migration)
-                if direction == 'downgrade':
-                    instance = MigrationHistory.get(MigrationHistory.name == migration)
-                    instance.delete_instance()
-        except Exception as exc:
-            self.database.rollback()
-            print('ERROR:', exc)
-            return False
-
-        return True
-
-    def revision(self, name=None):
-        """
-        Create a single blank migration file with given name or default of 'automigration'.
-
-        :param name: Name of migration to create (default automigration).
-        :return: True if migration file was created, otherwise False.
-        :type: bool
-        """
-        try:
-            if name is None:
-                name = 'automigration'
-            name = str(name).lower()
-            migration = self.next_migration(name)
-            with self.open_migration(migration, 'w') as handle:
-                handle.write(TEMPLATE.format(
-                    name=name,
-                    date=datetime.utcnow(),
-                    upgrade='pass',
-                    downgrade='pass'))
-        except Exception as exc:
-            print('ERROR:', exc)
-            return False
-
-        print('INFO:', '{}: created'.format(migration))
-        return True
-
-    def create(self, modelstr):
-        """
-        Create a new migration file for an existing model.
-        Model could actually also be a module, in which case all Peewee models are extracted
-        from the model and created.
-
-        :param modelstr: Python class, module, or string pointing to a class or module.
-        :return: True if migration file was created, otherwise False.
-        :type: bool
-        """
-        model = modelstr
-        if isinstance(modelstr, str):
-            model = pydoc.locate(modelstr)
-            if not model:
-                print('INFO:', 'could not import: {}'.format(modelstr))
-                return False
-
-        # If it's a module, we need to loop through all the models in it.
-        if inspect.ismodule(model):
-            print('model was module')
-            model_list = []
-            for item in model.__dict__.values():
-                if inspect.isclass(item) and issubclass(item, peewee.Model):
-                    if getattr(item, '__abstract__', False):
-                        continue
-                    model_list.append(item)
-            for model in peewee.sort_models_topologically(model_list):
-                self.create(model)
-            return True
-
-        try:
-            name = 'create table {}'.format(model._meta.db_table.lower())
-            migration = self.next_migration(name)
-
-            upgrade_ops = str.join('\n', build_upgrade_from_model(model))
-            downgrade_ops = str.join('\n', build_downgrade_from_model(model))
-
-            with self.open_migration(migration, 'w') as handle:
-                handle.write(TEMPLATE.format(
-                    name=name,
-                    date=datetime.utcnow(),
-                    upgrade=upgrade_ops,
-                    downgrade=downgrade_ops))
-        except Exception as exc:
-            print('ERROR:', exc)
-            return False
-
-        print('INFO:', '{}: created'.format(migration))
-        return True
 
 
 class TableCreator:
@@ -777,3 +370,422 @@ class Migrator:
         :rtype: cursor
         """
         return self.database.execute_sql(sql, params=params, require_commit=False)
+
+
+class DatabaseManager:
+    def __init__(self, database, table_name='migration_history', directory='migrations'):
+        """
+        Initialize a DatabaseManager with the given options.
+
+        :param database: Connection string, dict, or peewee.Database instance to use.
+        :param table_name: Table name to hold migrations (default migration_history).
+        :param directory: Directory to store migrations (default migrations).
+        """
+        self.directory = str(directory)
+        os.makedirs(self.directory, exist_ok=True)
+        self.database = self.load_database(database)
+        self.migrator = Migrator(self.database)
+
+        MigrationHistory._meta.database = self.database
+        MigrationHistory._meta.db_table = table_name
+        MigrationHistory.create_table(fail_silently=True)
+
+    def load_database(self, database):
+        """
+        Load the given database, whatever it might be.
+
+        :param database: Connection string, dict, or peewee.Database instance to use.
+        :raises: peewee.DatabaseError if database connection cannot be established.
+        :return: Database connection.
+        :rtype: peewee.Database instance.
+        """
+        if isinstance(database, peewee.Database):
+            return database
+
+        if isinstance(database, dict):
+            try:
+                name = database.pop('name')
+                engine = database.pop('engine')
+            except KeyError:
+                error_msg = 'Configuration dict must specify "name" and "engine" keys.'
+                raise peewee.DatabaseError(error_msg)
+
+            db_class = pydoc.locate(engine)
+            if not db_class:
+                raise peewee.DatabaseError('Unable to import engine class: {}'.format(engine))
+            return db_class(name, **database)
+
+        return db_url_connect(database)
+
+    @property
+    def migration_files(self):
+        """
+        List all the migrations sitting on the filesystem.
+
+        :return: List of migration names.
+        :rtype: list
+        """
+        files = (f[:-len('.py')] for f in os.listdir(self.directory) if f.endswith('.py'))
+        return sorted(files)
+
+    @property
+    def db_migrations(self):
+        """
+        List all the migrations applied to the database.
+
+        :return: List of migration names.
+        :rtype: list
+        """
+        return sorted(row.name for row in MigrationHistory.select())
+
+    @property
+    def diff(self):
+        """
+        List all the migrations that have not been applied to the database.
+
+        :return: List of migration names.
+        :rtype: list
+        """
+        return sorted(set(self.migration_files) - set(self.db_migrations))
+
+    def find_migration(self, value):
+        """
+        Try to find a migration by name or start of name.
+
+        :raises: ValueError if no matching migration is found.
+        :return: Name of matching migration.
+        :rtype: str
+        """
+        value = str(value)
+        for name in self.migration_files:
+            if name == value:
+                return name
+            if name.startswith('{}_'.format(value)):
+                return name
+        raise ValueError('could not find migration: {}'.format(value))
+
+    def get_ident(self):
+        """
+        Return a unique identifier for a revision. Override this method to change functionality.
+        Make sure the IDs will be sortable (like timestamps or incremental numbers).
+
+        :return: Name of new migration.
+        :rtype: str
+        """
+        next_id = 1
+        if self.migration_files:
+            next_id = int(list(self.migration_files)[-1].split('_')[0]) + 1
+        return '{:04}'.format(next_id)
+
+    def next_migration(self, name):
+        """
+        Get the name of the next migration that should be created.
+
+        :param name: Name to use for migration (not including identifier).
+        :return: Name of new migration.
+        :rtype: str
+        """
+        return '{}_{}'.format(self.get_ident(), name.replace(' ', '_'))
+
+    def get_filename(self, migration):
+        """
+        Return the full path and filename for the given migration.
+
+        :param migration: Name of migration to find (not including extension).
+        :return: Path and filename to migration.
+        :rtype: str
+        """
+        return os.path.join(self.directory, '{}.py'.format(migration))
+
+    def open_migration(self, migration, mode='r'):
+        """
+        Open a migration file with the given mode and return it.
+
+        :param migration: Name of migration to find (not including extension).
+        :param mode: Mode to pass to open(). Most likely 'r' or 'w'.
+        :raises: IOError if the file cannot be opened.
+        :return: File instance.
+        :rtype: io.FileIO
+        """
+        return open(self.get_filename(migration), mode)
+
+    def info(self):
+        """
+        Show the current database.
+        Don't include any sensitive information like passwords.
+
+        :return: String representation.
+        :rtype: str
+        """
+        driver = self.database.__class__.__name__
+        database = self.database.database
+        print('INFO:', 'driver =', driver)
+        print('INFO:', 'database =', database)
+
+    def delete(self, migration):
+        """
+        Delete the migration from filesystem and database. As if it never happened.
+
+        :param migration: Name of migration to find (not including extension).
+        :return: True if delete was successful, otherwise False.
+        :type: bool
+        """
+        try:
+            migration = self.find_migration(migration)
+            os.remove(self.get_filename(migration))
+            with self.database.transaction():
+                cmd = MigrationHistory.delete().where(MigrationHistory.name == migration)
+                cmd.execute()
+        except Exception as exc:
+            self.database.rollback()
+            print('ERROR:', exc)
+            return False
+
+        print('INFO:', '{}: delete'.format(migration))
+        return True
+
+    def status(self):
+        """
+        Show all the migrations and a status for each.
+
+        :return: True if listing was successful, otherwise None.
+        :type: bool
+        """
+        if not self.migration_files:
+            print('INFO:', 'no migrations found')
+            return True
+        for name in self.migration_files:
+            status = 'applied' if name in self.db_migrations else 'pending'
+            print('INFO:', '{}: {}'.format(name, status))
+        return True
+
+    def upgrade(self, target=None):
+        """
+        Run all the migrations (up to target if specified). If no target, run all upgrades.
+
+        :param target: Migration target to limit upgrades.
+        :return: True if upgrade was successful, otherwise False.
+        :type: bool
+        """
+        try:
+            if target:
+                target = self.find_migration(target)
+                if target in self.db_migrations:
+                    print('INFO:', '{}: already applied'.format(target))
+                    return False
+        except ValueError as exc:
+            print('ERROR:', exc)
+            return False
+
+        if self.diff:
+            for name in self.diff:
+                rv = self.run_migration(name, 'upgrade')
+                # If it didn't work, don't try any more.
+                # Or if we are at the end of the line, don't run anymore.
+                if not rv or (target and target == name):
+                    break
+            return True
+
+        print('INFO:', 'all migrations applied!')
+        return True
+
+    def downgrade(self, target=None):
+        """
+        Run all the migrations (down to target if specified). If no target, run one downgrade.
+
+        :param target: Migration target to limit downgrades.
+        :return: True if downgrade was successful, otherwise False.
+        :type: bool
+        """
+        try:
+            if target:
+                target = self.find_migration(target)
+                if target not in self.db_migrations:
+                    print('INFO:', '{}: not yet applied'.format(target))
+                    return False
+        except ValueError as exc:
+            print('ERROR:', exc)
+            return False
+
+        diff = self.db_migrations[::-1]
+        if diff:
+            for name in diff:
+                rv = self.run_migration(name, 'downgrade')
+                # If it didn't work, don't try any more.
+                # Or if we are at the end of the line, don't run anymore.
+                if not rv or (not target or target == name):
+                    break
+            return True
+
+        print('INFO:', 'migrations not yet applied!')
+        return True
+
+    def run_migration(self, migration, direction='upgrade'):
+        """
+        Run a single migration. Does not check to see if migration has already been applied.
+
+        :param migration: Migration to run.
+        :param: Direction to run (either 'upgrade' or 'downgrade') (default upgrade).
+        :return: True if migration was run successfully, otherwise False.
+        :type: bool
+        """
+        try:
+            migration = self.find_migration(migration)
+        except ValueError as exc:
+            print('ERROR:', exc)
+            return False
+
+        try:
+            print('INFO:', '{}: {}'.format(migration, direction))
+            with self.database.transaction():
+                scope = {}
+                with self.open_migration(migration, 'r') as handle:
+                    exec(handle.read(), scope)
+
+                method = scope.get(direction, lambda migrator: None)
+                method(self.migrator)
+
+                if direction == 'upgrade':
+                    MigrationHistory.create(name=migration)
+                if direction == 'downgrade':
+                    instance = MigrationHistory.get(MigrationHistory.name == migration)
+                    instance.delete_instance()
+        except Exception as exc:
+            self.database.rollback()
+            print('ERROR:', exc)
+            return False
+
+        return True
+
+    def revision(self, name=None):
+        """
+        Create a single blank migration file with given name or default of 'automigration'.
+
+        :param name: Name of migration to create (default automigration).
+        :return: True if migration file was created, otherwise False.
+        :type: bool
+        """
+        try:
+            if name is None:
+                name = 'auto migration'
+            name = str(name).lower().strip()
+            migration = self.next_migration(name)
+            with self.open_migration(migration, 'w') as handle:
+                handle.write(TEMPLATE.format(
+                    name=name,
+                    date=datetime.utcnow(),
+                    upgrade='pass',
+                    downgrade='pass'))
+        except Exception as exc:
+            print('ERROR:', exc)
+            return False
+
+        print('INFO:', '{}: created'.format(migration))
+        return True
+
+    def create(self, modelstr):
+        """
+        Create a new migration file for an existing model.
+        Model could actually also be a module, in which case all Peewee models are extracted
+        from the model and created.
+
+        :param modelstr: Python class, module, or string pointing to a class or module.
+        :return: True if migration file was created, otherwise False.
+        :type: bool
+        """
+        model = modelstr
+        if isinstance(modelstr, str):
+            model = pydoc.locate(modelstr)
+            if not model:
+                print('INFO:', 'could not import: {}'.format(modelstr))
+                return False
+
+        # If it's a module, we need to loop through all the models in it.
+        if inspect.ismodule(model):
+            model_list = []
+            for item in model.__dict__.values():
+                if inspect.isclass(item) and issubclass(item, peewee.Model):
+                    if getattr(item, '__abstract__', False):
+                        continue
+                    model_list.append(item)
+            for model in peewee.sort_models_topologically(model_list):
+                self.create(model)
+            return True
+
+        try:
+            name = 'create table {}'.format(model._meta.db_table.lower())
+            migration = self.next_migration(name)
+
+            upgrade_ops = str.join('\n', build_upgrade_from_model(model))
+            downgrade_ops = str.join('\n', build_downgrade_from_model(model))
+
+            with self.open_migration(migration, 'w') as handle:
+                handle.write(TEMPLATE.format(
+                    name=name,
+                    date=datetime.utcnow(),
+                    upgrade=upgrade_ops,
+                    downgrade=downgrade_ops))
+        except Exception as exc:
+            print('ERROR:', exc)
+            return False
+
+        print('INFO:', '{}: created'.format(migration))
+        return True
+
+if EXTENSION_CLICK:
+
+    def get_database_manager():
+        """Return a DatabaseManager for the current Flask application."""
+        directory = os.path.join(current_app.root_path, 'migrations')
+        return DatabaseManager(current_app.config['DATABASE'], directory=directory)
+
+    @click.group()
+    def command():
+        """Run Peewee migration commands."""
+
+    @command.command()
+    @click.argument('model')
+    @cli.with_appcontext
+    def create(model):
+        """Create a migration based on an existing model."""
+        get_database_manager().create(model)
+
+    @command.command()
+    @cli.with_appcontext
+    def info():
+        """Show information about the current database."""
+        get_database_manager().info()
+
+    @command.command()
+    @cli.with_appcontext
+    def status():
+        """Show information about the database."""
+        get_database_manager().status()
+
+    @command.command()
+    @click.argument('name')
+    @cli.with_appcontext
+    def revision(name):
+        """Create a blank migration file."""
+        get_database_manager().revision(name)
+
+    @command.command()
+    @click.argument('target', default='')
+    @cli.with_appcontext
+    def upgrade(target):
+        """Run database upgrades."""
+        get_database_manager().upgrade(target)
+
+    @command.command()
+    @click.argument('target', default='')
+    @cli.with_appcontext
+    def downgrade(target):
+        """Run database downgrades."""
+        get_database_manager().downgrade(target)
+
+    @command.command()
+    @click.argument('target', default='')
+    @cli.with_appcontext
+    def delete(target):
+        """Delete the target migration from the filesystem and database."""
+        get_database_manager().delete(target)

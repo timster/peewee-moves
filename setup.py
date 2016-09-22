@@ -42,5 +42,11 @@ setup(
 
     py_modules=['peewee_moves'],
 
+    entry_points={
+        'flask.commands': [
+            'db = peewee_moves:command',
+        ],
+    },
+
     install_requires=install_requires,
 )
