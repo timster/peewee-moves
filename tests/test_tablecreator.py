@@ -39,7 +39,6 @@ def test_constraint():
 
 def test_foreign_key():
     tc = TableCreator('awesome')
-    tc.foreign_key('user_id', references='user.id', on_delete='cascade', on_update='cascade')
+    tc.foreign_key('user', references='user.id', on_delete='cascade', on_update='cascade')
 
-    const = 'FOREIGN KEY(user_id) REFERENCES user(id) ON DELETE cascade ON UPDATE cascade'
-    assert tc.model._meta.constraints[0].value == const
+    assert isinstance(tc.model.user, peewee.ForeignKeyField)

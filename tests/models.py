@@ -41,3 +41,10 @@ class ComplexPerson(peewee.Model):
             'const1 fake',
             'const2 fake',
         )
+
+
+class HasCheckConstraint(peewee.Model):
+    name = peewee.CharField(null=False, constraints=[peewee.Check("name in ('tim', 'bob')")])
+
+    class Meta:
+        database = database

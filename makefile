@@ -33,3 +33,8 @@ release: clean
 
 test:
 	py.test
+
+testcov:
+	py.test --cov=.
+	coverage html --directory=.covhtml
+	open .covhtml/index.html

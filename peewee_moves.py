@@ -3,9 +3,8 @@ from datetime import datetime
 import inspect
 import os
 import pydoc
-import sys
 
-from playhouse.db_url import connect as db_url_connect
+from playhouse.db_url import connect as url_connect
 from playhouse.migrate import SchemaMigrator
 import peewee
 
@@ -16,6 +15,7 @@ try:
     EXTENSION_CLICK = True
 except ImportError:
     EXTENSION_CLICK = False
+
 
 FIELD_TO_PEEWEE = {
     'bare': peewee.BareField,
@@ -44,17 +44,13 @@ PEEWEE_TO_FIELD[peewee.PrimaryKeyField] = 'primary_key'
 PEEWEE_TO_FIELD[peewee.ForeignKeyField] = 'foreign_key'
 PEEWEE_TO_FIELD[peewee.TimestampField] = 'int'
 
-FIELD_KWARGS = (
-    'null', 'index', 'unique', 'constraints', 'sequence',
-    'max_length', 'max_digits', 'decimal_places'
-)
+FIELD_KWARGS = ('null', 'index', 'unique', 'sequence', 'max_length', 'max_digits', 'decimal_places')
 
-TEMPLATE = (
+TEMPLATE = ''.join((
     '"""\n{name}\ndate created: {date}\n"""\n\n\n',
-    'def upgrade(migrator):\n    {upgrade}\n\n\n',
-    'def downgrade(migrator):\n    {downgrade}\n'
-)
-TEMPLATE = str.join('', TEMPLATE)
+    'def upgrade(migrator):\n{upgrade}\n\n\n',
+    'def downgrade(migrator):\n{downgrade}\n'
+))
 
 
 def build_downgrade_from_model(model):
@@ -81,10 +77,10 @@ def build_upgrade_from_model(model):
     yield "with migrator.create_table('{}') as table:".format(model._meta.db_table)
 
     for field in model._meta.sorted_fields:
-        coltype = PEEWEE_TO_FIELD.get(field.__class__, 'char')
+        field_type = PEEWEE_TO_FIELD.get(field.__class__, 'char')
 
         # Add all fields. Foreign Key is a special case.
-        if coltype == 'foreign_key':
+        if field_type == 'foreign_key':
             other_table = field.rel_model._meta.db_table
             other_col = field.to_field.db_column
             kwargs = {'references': '{}.{}'.format(other_table, other_col)}
@@ -92,6 +88,18 @@ def build_upgrade_from_model(model):
             kwargs = {
                 key: getattr(field, key) for key in FIELD_KWARGS if getattr(field, key, None)
             }
+
+            # Check for constraints which is a special case
+            constraints = []
+            field_constraints = getattr(field, 'constraints', ())
+            if field_constraints:
+                for const in field_constraints:
+                    if isinstance(const, peewee.SQL):
+                        constraints.append(const.value)
+                    else:
+                        constraints.append(const)
+            if constraints:
+                kwargs['constraints'] = constraints
 
         # Flatten the keyword arguments for the field.
         args_list = ["'{}'".format(field.db_column)]
@@ -101,24 +109,28 @@ def build_upgrade_from_model(model):
             args_list.append('{}={}'.format(key, value))
 
         # Then yield the field!
-        yield "        table.{}({})".format(coltype, str.join(', ', args_list))
+        yield "    table.{}({})".format(field_type, str.join(', ', args_list))
 
-    indexes = getattr(model._meta, 'indexes', [])
-    if indexes:
-        for columns, unique in indexes:
-            yield "        table.add_index({}, unique={})".format(columns, unique)
-
+    # Loop through all constraints and yield them!
     constraints = getattr(model._meta, 'constraints', [])
     if constraints:
         for const in constraints:
-            yield "        table.add_constraint({})".format(const)
+            yield "    table.add_constraint({})".format(const)
+
+    # Loop through all indexes and yield them!
+    indexes = getattr(model._meta, 'indexes', [])
+    if indexes:
+        for columns, unique in indexes:
+            yield "    table.add_index({}, unique={})".format(columns, unique)
 
 
 class MigrationHistory(peewee.Model):
-    name = peewee.CharField()
+    """Base model to manage migration history in a database."""
+    name = peewee.CharField(unique=True)
     date_applied = peewee.DateTimeField(default=datetime.utcnow)
 
     class Meta:
+        database = peewee.Proxy()
         db_table = 'migration_history'
 
 
@@ -130,7 +142,7 @@ class TableCreator:
         :param name: Name of database table.
         """
         self.name = name
-        self.model = TableCreator.build_fake_model(self.name)
+        self.model = self.build_fake_model(self.name)
 
         # Dynamically add a method for all of the field types.
         for fieldname, fieldtype in FIELD_TO_PEEWEE.items():
@@ -138,8 +150,7 @@ class TableCreator:
                 self.column(fieldtype, name, **kwargs)
             setattr(self, fieldname, method)
 
-    @staticmethod
-    def build_fake_model(name):
+    def build_fake_model(self, name):
         """
         Build a fake model with some defaults and the given table name.
         We need this so we can perform operations that actually require a model class.
@@ -148,12 +159,14 @@ class TableCreator:
         :return: A new model class.
         :rtype: peewee.Model
         """
-        class Meta:
-            primary_key = False
-            indexes = []
-            constraints = []
-            db_table = name
-        return type('FakeModel', (peewee.Model,), {'Meta': Meta})
+        class FakeModel(peewee.Model):
+            class Meta:
+                database = peewee.Proxy()
+                primary_key = False
+                indexes = []
+                constraints = []
+                db_table = name
+        return FakeModel
 
     def column(self, coltype, name, **kwargs):
         """
@@ -163,8 +176,60 @@ class TableCreator:
         :param name: Name of column.
         :param kwargs: Arguments for the given column type.
         """
+        constraints = kwargs.pop('constraints', [])
+
+        new_constraints = []
+        for const in constraints:
+            if isinstnace(const, str):
+                const = peewee.Check(const)
+            new_constraints.append(const)
+
+        if new_constraints:
+            kwargs['constraints'] = new_constraints
+
         field_class = FIELD_TO_PEEWEE.get(coltype, peewee.CharField)
         field_class(**kwargs).add_to_class(self.model, name)
+
+    def primary_key(self, name):
+        """
+        Add a primary key to the model.
+        This has some special cases, which is why it's not handled like all the other column types.
+
+        :param name: Name of column.
+        :return: None
+        """
+        pk_field = peewee.PrimaryKeyField(primary_key=True)
+        self.model._meta.primary_key = pk_field
+        self.model._meta.auto_increment = True
+        pk_field.add_to_class(self.model, name)
+
+    def foreign_key(self, name, references, **kwargs):
+        """
+        Add a foreign key to the model.
+        This has some special cases, which is why it's not handled like all the other column types.
+
+        :param name: Name of the foreign key.
+        :param references: Table name in the format of "table.column" or just
+            "table" (and id will be default column).
+        :param kwargs: Additional kwargs to pass to the column instance.
+            You can also provide "on_delete" and "on_update" to add constraints.
+        :return: None
+        """
+        if name.endswith('_id'):
+            name = name[:-3]
+
+        try:
+            rel_table, rel_column = references.split('.', 1)
+        except ValueError:
+            rel_table, rel_column = references, 'id'
+
+        class DummyRelated(peewee.Model):
+            class Meta:
+                database = peewee.Proxy()
+                db_table = rel_table
+
+        field = peewee.ForeignKeyField(DummyRelated, to_field=rel_column, **kwargs)
+        field.add_to_class(self.model, name)
 
     def add_index(self, columns, unique=False):
         """
@@ -184,48 +249,6 @@ class TableCreator:
         """
         self.model._meta.constraints.append(peewee.SQL(value))
 
-    def primary_key(self, name):
-        """
-        Add a primary key to the model.
-        This has some special cases, which is why it's not handled like all the other column types.
-
-        :param name: Name of column.
-        :return: None
-        """
-        pkfield = peewee.PrimaryKeyField(primary_key=True)
-        self.model._meta.primary_key = pkfield
-        self.model._meta.auto_increment = True
-        pkfield.add_to_class(self.model, name)
-
-    def foreign_key(self, name, references, **kwargs):
-        """
-        Add a foreign key to the model.
-        This has some special cases, which is why it's not handled like all the other column types.
-
-        :param name: Name of the foreign key.
-        :param references: Table name in the format of "table.column" or just
-            "table" (and id will be default column).
-        :param kwargs: Additional kwargs to pass to the column instance.
-            You can also provide "on_delete" and "on_update" to add constraints.
-        :return: None
-        """
-        on_delete = kwargs.pop('on_delete', False)
-        on_update = kwargs.pop('on_update', False)
-        rel_table, rel_col = references, 'id'
-        splitref = references.split('.', 1)
-        if len(splitref) == 2:
-            rel_table, rel_col = splitref
-
-        const = 'FOREIGN KEY({}) REFERENCES {}({})'.format(name, rel_table, rel_col)
-        if on_delete:
-            const += ' ON DELETE {}'.format(on_delete)
-        if on_update:
-            const += ' ON UPDATE {}'.format(on_update)
-
-        kwargs['index'] = True
-        self.column('integer', name, **kwargs)
-        self.add_constraint(const)
-
 
 class Migrator:
     def __init__(self, database):
@@ -237,6 +260,7 @@ class Migrator:
         """
         self.database = database
         self.migrator = SchemaMigrator.from_database(self.database)
+        self.models = []
 
     @contextmanager
     def create_table(self, name, safe=False):
@@ -249,18 +273,12 @@ class Migrator:
         :return: generator
         :rtype: TableCreator
         """
-        table = TableCreator(name)
+        creator = TableCreator(name)
+        creator.model._meta.database.initialize(self.database)
 
-        yield table
+        yield creator
 
-        self.database.create_table(table.model, safe=safe)
-
-        for field in table.model._fields_to_index():
-            self.database.create_index(table.model, [field], field.unique)
-
-        if table.model._meta.indexes:
-            for fields, unique in table.model._meta.indexes:
-                self.database.create_index(table.model, fields, unique)
+        creator.model.create_table()
 
     def drop_table(self, name, safe=False, cascade=False):
         """
@@ -271,8 +289,9 @@ class Migrator:
         :param cascade: If True, drop will be cascaded.
         :return: None
         """
-        model = TableCreator.build_fake_model(name)
-        self.database.drop_table(model, fail_silently=safe, cascade=cascade)
+        creator = TableCreator(name)
+        creator.model._meta.database.initialize(self.database)
+        self.database.drop_table(creator.model, fail_silently=safe, cascade=cascade)
 
     def add_column(self, table, name, coltype, **kwargs):
         """
@@ -373,7 +392,9 @@ class Migrator:
 
 
 class DatabaseManager:
-    def __init__(self, database, table_name='migration_history', directory='migrations'):
+    ext = '.py'
+
+    def __init__(self, database, table_name='migration_history', directory='migrations', out=print):
         """
         Initialize a DatabaseManager with the given options.
 
@@ -381,13 +402,15 @@ class DatabaseManager:
         :param table_name: Table name to hold migrations (default migration_history).
         :param directory: Directory to store migrations (default migrations).
         """
+        self.out = out
         self.directory = str(directory)
-        os.makedirs(self.directory, exist_ok=True)
         self.database = self.load_database(database)
         self.migrator = Migrator(self.database)
 
-        MigrationHistory._meta.database = self.database
+        os.makedirs(self.directory, exist_ok=True)
+
         MigrationHistory._meta.db_table = table_name
+        MigrationHistory._meta.database.initialize(self.database)
         MigrationHistory.create_table(fail_silently=True)
 
     def load_database(self, database):
@@ -399,9 +422,11 @@ class DatabaseManager:
         :return: Database connection.
         :rtype: peewee.Database instance.
         """
+        # It could be an actual instance...
         if isinstance(database, peewee.Database):
             return database
 
+        # It could be a dictionary...
         if isinstance(database, dict):
             try:
                 name = database.pop('name')
@@ -415,7 +440,8 @@ class DatabaseManager:
                 raise peewee.DatabaseError('Unable to import engine class: {}'.format(engine))
             return db_class(name, **database)
 
-        return db_url_connect(database)
+        # Or it could be a database URL.
+        return url_connect(database)
 
     @property
     def migration_files(self):
@@ -425,7 +451,7 @@ class DatabaseManager:
         :return: List of migration names.
         :rtype: list
         """
-        files = (f[:-len('.py')] for f in os.listdir(self.directory) if f.endswith('.py'))
+        files = (f[:-len(self.ext)] for f in os.listdir(self.directory) if f.endswith(self.ext))
         return sorted(files)
 
     @property
@@ -458,9 +484,7 @@ class DatabaseManager:
         """
         value = str(value)
         for name in self.migration_files:
-            if name == value:
-                return name
-            if name.startswith('{}_'.format(value)):
+            if name == value or name.startswith('{}_'.format(value)):
                 return name
         raise ValueError('could not find migration: {}'.format(value))
 
@@ -495,7 +519,7 @@ class DatabaseManager:
         :return: Path and filename to migration.
         :rtype: str
         """
-        return os.path.join(self.directory, '{}.py'.format(migration))
+        return os.path.join(self.directory, '{}{}'.format(migration, self.ext))
 
     def open_migration(self, migration, mode='r'):
         """
@@ -509,6 +533,28 @@ class DatabaseManager:
         """
         return open(self.get_filename(migration), mode)
 
+    def write_migration(self, migration, name, upgrade='pass', downgrade='pass'):
+        """
+        Open a migration file and write the given attributes to it.
+
+        :param migration: Name of migration to find (not including extension).
+        :name: Name to write in file header.
+        :upgrade: Text for upgrade operations.
+        :downgrade: Text for downgrade operations.
+        :raises: IOError if the file cannot be opened.
+        :return: None.
+        """
+        with self.open_migration(migration, 'w') as handle:
+            if not isinstance(upgrade, str):
+                upgrade = '\n    '.join(upgrade)
+            if not isinstance(downgrade, str):
+                downgrade = '\n    '.join(downgrade)
+            handle.write(TEMPLATE.format(
+                    name=name,
+                    date=datetime.utcnow(),
+                    upgrade='    ' + upgrade,
+                    downgrade='    ' + downgrade))
+
     def info(self):
         """
         Show the current database.
@@ -519,8 +565,22 @@ class DatabaseManager:
         """
         driver = self.database.__class__.__name__
         database = self.database.database
-        print('INFO:', 'driver =', driver)
-        print('INFO:', 'database =', database)
+        self.out('INFO:', 'driver =', driver)
+        self.out('INFO:', 'database =', database)
+
+    def status(self):
+        """
+        Show all the migrations and a status for each.
+
+        :return: True if listing was successful, otherwise None.
+        :rtype: bool
+        """
+        if not self.migration_files:
+            self.out('INFO:', 'no migrations found')
+            return
+        for name in self.migration_files:
+            status = 'applied' if name in self.db_migrations else 'pending'
+            self.out('INFO:', '{}: {}'.format(name, status))
 
     def delete(self, migration):
         """
@@ -528,7 +588,7 @@ class DatabaseManager:
 
         :param migration: Name of migration to find (not including extension).
         :return: True if delete was successful, otherwise False.
-        :type: bool
+        :rtype: bool
         """
         try:
             migration = self.find_migration(migration)
@@ -538,25 +598,10 @@ class DatabaseManager:
                 cmd.execute()
         except Exception as exc:
             self.database.rollback()
-            print('ERROR:', exc)
+            self.out('ERROR:', exc)
             return False
 
-        print('INFO:', '{}: delete'.format(migration))
-        return True
-
-    def status(self):
-        """
-        Show all the migrations and a status for each.
-
-        :return: True if listing was successful, otherwise None.
-        :type: bool
-        """
-        if not self.migration_files:
-            print('INFO:', 'no migrations found')
-            return True
-        for name in self.migration_files:
-            status = 'applied' if name in self.db_migrations else 'pending'
-            print('INFO:', '{}: {}'.format(name, status))
+        self.out('INFO:', '{}: delete'.format(migration))
         return True
 
     def upgrade(self, target=None):
@@ -565,28 +610,28 @@ class DatabaseManager:
 
         :param target: Migration target to limit upgrades.
         :return: True if upgrade was successful, otherwise False.
-        :type: bool
+        :rtype: bool
         """
         try:
             if target:
                 target = self.find_migration(target)
                 if target in self.db_migrations:
-                    print('INFO:', '{}: already applied'.format(target))
+                    self.out('INFO:', '{}: already applied'.format(target))
                     return False
         except ValueError as exc:
-            print('ERROR:', exc)
+            self.out('ERROR:', exc)
             return False
 
-        if self.diff:
-            for name in self.diff:
-                rv = self.run_migration(name, 'upgrade')
-                # If it didn't work, don't try any more.
-                # Or if we are at the end of the line, don't run anymore.
-                if not rv or (target and target == name):
-                    break
-            return True
+        if not self.diff:
+            self.out('INFO:', 'all migrations applied!')
+            return False
 
-        print('INFO:', 'all migrations applied!')
+        for name in self.diff:
+            success = self.run_migration(name, 'upgrade')
+            # If it didn't work, don't try any more.
+            # Or if we are at the end of the line, don't run anymore.
+            if not success or (target and target == name):
+                break
         return True
 
     def downgrade(self, target=None):
@@ -595,29 +640,30 @@ class DatabaseManager:
 
         :param target: Migration target to limit downgrades.
         :return: True if downgrade was successful, otherwise False.
-        :type: bool
+        :rtype: bool
         """
         try:
             if target:
                 target = self.find_migration(target)
                 if target not in self.db_migrations:
-                    print('INFO:', '{}: not yet applied'.format(target))
+                    self.out('INFO:', '{}: not yet applied'.format(target))
                     return False
         except ValueError as exc:
-            print('ERROR:', exc)
+            self.out('ERROR:', exc)
             return False
 
         diff = self.db_migrations[::-1]
-        if diff:
-            for name in diff:
-                rv = self.run_migration(name, 'downgrade')
-                # If it didn't work, don't try any more.
-                # Or if we are at the end of the line, don't run anymore.
-                if not rv or (not target or target == name):
-                    break
-            return True
 
-        print('INFO:', 'migrations not yet applied!')
+        if not diff:
+            self.out('INFO:', 'migrations not yet applied!')
+            return False
+
+        for name in diff:
+            success = self.run_migration(name, 'downgrade')
+            # If it didn't work, don't try any more.
+            # Or if we are at the end of the line, don't run anymore.
+            if not success or (not target or target == name):
+                break
         return True
 
     def run_migration(self, migration, direction='upgrade'):
@@ -632,27 +678,30 @@ class DatabaseManager:
         try:
             migration = self.find_migration(migration)
         except ValueError as exc:
-            print('ERROR:', exc)
+            self.out('ERROR:', exc)
             return False
 
         try:
-            print('INFO:', '{}: {}'.format(migration, direction))
+            self.out('INFO:', '{}: {}'.format(migration, direction))
             with self.database.transaction():
                 scope = {}
                 with self.open_migration(migration, 'r') as handle:
                     exec(handle.read(), scope)
 
-                method = scope.get(direction, lambda migrator: None)
-                method(self.migrator)
+                method = scope.get(direction, None)
+                if method:
+                    method(self.migrator)
 
                 if direction == 'upgrade':
                     MigrationHistory.create(name=migration)
+
                 if direction == 'downgrade':
                     instance = MigrationHistory.get(MigrationHistory.name == migration)
                     instance.delete_instance()
+
         except Exception as exc:
             self.database.rollback()
-            print('ERROR:', exc)
+            self.out('ERROR:', exc)
             return False
 
         return True
@@ -670,17 +719,12 @@ class DatabaseManager:
                 name = 'auto migration'
             name = str(name).lower().strip()
             migration = self.next_migration(name)
-            with self.open_migration(migration, 'w') as handle:
-                handle.write(TEMPLATE.format(
-                    name=name,
-                    date=datetime.utcnow(),
-                    upgrade='pass',
-                    downgrade='pass'))
+            self.write_migration(migration, name=name)
         except Exception as exc:
-            print('ERROR:', exc)
+            self.out('ERROR:', exc)
             return False
 
-        print('INFO:', '{}: created'.format(migration))
+        self.out('INFO:', '{}: created'.format(migration))
         return True
 
     def create(self, modelstr):
@@ -697,7 +741,7 @@ class DatabaseManager:
         if isinstance(modelstr, str):
             model = pydoc.locate(modelstr)
             if not model:
-                print('INFO:', 'could not import: {}'.format(modelstr))
+                self.out('INFO:', 'could not import: {}'.format(modelstr))
                 return False
 
         # If it's a module, we need to loop through all the models in it.
@@ -715,22 +759,16 @@ class DatabaseManager:
         try:
             name = 'create table {}'.format(model._meta.db_table.lower())
             migration = self.next_migration(name)
-
-            upgrade_ops = str.join('\n', build_upgrade_from_model(model))
-            downgrade_ops = str.join('\n', build_downgrade_from_model(model))
-
-            with self.open_migration(migration, 'w') as handle:
-                handle.write(TEMPLATE.format(
-                    name=name,
-                    date=datetime.utcnow(),
-                    upgrade=upgrade_ops,
-                    downgrade=downgrade_ops))
+            up_ops = build_upgrade_from_model(model)
+            down_ops = build_downgrade_from_model(model)
+            self.write_migration(migration, name=name, upgrade=up_ops, downgrade=down_ops)
         except Exception as exc:
-            print('ERROR:', exc)
+            self.out('ERROR:', exc)
             return False
 
-        print('INFO:', '{}: created'.format(migration))
+        self.out('INFO:', '{}: created'.format(migration))
         return True
+
 
 if EXTENSION_CLICK:
 

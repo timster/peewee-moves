@@ -24,9 +24,10 @@ def test_create_migration_module(tmpdir, capsys):
     manager.create(models)
     out, err = capsys.readouterr()
     assert 'INFO: 0001_create_table_basicfields: created' in out
-    assert 'INFO: 0002_create_table_organization: created' in out
-    assert 'INFO: 0003_create_table_complexperson: created' in out
-    assert 'INFO: 0004_create_table_person: created' in out
+    assert 'INFO: 0002_create_table_hascheckconstraint: created' in out
+    assert 'INFO: 0003_create_table_organization: created' in out
+    assert 'INFO: 0004_create_table_complexperson: created' in out
+    assert 'INFO: 0005_create_table_person: created' in out
 
 
 def test_build_upgrade_from_model():
@@ -34,9 +35,9 @@ def test_build_upgrade_from_model():
     output = list(output)
     assert output == [
         "with migrator.create_table('complexperson') as table:",
-        "        table.primary_key('id')",
-        "        table.char('name', max_length=5, unique=True)",
-        "        table.foreign_key('organization_id', references='organization.id')",
-        "        table.add_constraint(const1 fake)",
-        "        table.add_constraint(const2 fake)",
+        "    table.primary_key('id')",
+        "    table.char('name', max_length=5, unique=True)",
+        "    table.foreign_key('organization_id', references='organization.id')",
+        "    table.add_constraint(const1 fake)",
+        "    table.add_constraint(const2 fake)",
     ]
