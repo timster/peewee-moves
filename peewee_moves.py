@@ -599,7 +599,6 @@ class DatabaseManager:
         except Exception as exc:
             self.database.rollback()
             self.out('ERROR:', exc)
-            raise
             return False
 
         self.out('INFO:', '{}: delete'.format(migration))
@@ -621,7 +620,6 @@ class DatabaseManager:
                     return False
         except ValueError as exc:
             self.out('ERROR:', exc)
-            raise
             return False
 
         if not self.diff:
@@ -652,7 +650,6 @@ class DatabaseManager:
                     return False
         except ValueError as exc:
             self.out('ERROR:', exc)
-            raise
             return False
 
         diff = self.db_migrations[::-1]
@@ -682,13 +679,14 @@ class DatabaseManager:
             migration = self.find_migration(migration)
         except ValueError as exc:
             self.out('ERROR:', exc)
-            raise
             return False
 
         try:
             self.out('INFO:', '{}: {}'.format(migration, direction))
             with self.database.transaction():
-                scope = {}
+                scope = {
+                    '__file__': self.get_filename(migration),
+                }
                 with self.open_migration(migration, 'r') as handle:
                     exec(handle.read(), scope)
 
@@ -706,7 +704,6 @@ class DatabaseManager:
         except Exception as exc:
             self.database.rollback()
             self.out('ERROR:', exc)
-            raise
             return False
 
         return True
@@ -727,7 +724,6 @@ class DatabaseManager:
             self.write_migration(migration, name=name)
         except Exception as exc:
             self.out('ERROR:', exc)
-            raise
             return False
 
         self.out('INFO:', '{}: created'.format(migration))
@@ -770,7 +766,6 @@ class DatabaseManager:
             self.write_migration(migration, name=name, upgrade=up_ops, downgrade=down_ops)
         except Exception as exc:
             self.out('ERROR:', exc)
-            raise
             return False
 
         self.out('INFO:', '{}: created'.format(migration))
