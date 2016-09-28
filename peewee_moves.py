@@ -90,15 +90,14 @@ def build_upgrade_from_model(model):
             }
 
             # Check for constraints which is a special case
-            constraints = []
             field_constraints = getattr(field, 'constraints', ())
             if field_constraints:
+                constraints = []
                 for const in field_constraints:
                     value = const
                     if isinstance(const, peewee.SQL):
                         value = const.value
                     constraints.append(value)
-            if constraints:
                 kwargs['constraints'] = constraints
 
         # Flatten the keyword arguments for the field.
@@ -115,7 +114,10 @@ def build_upgrade_from_model(model):
     constraints = getattr(model._meta, 'constraints', [])
     if constraints:
         for const in constraints:
-            yield "    table.add_constraint({})".format(const)
+            value = const
+            if isinstance(const, peewee.SQL):
+                value = const.value
+            yield "    table.add_constraint('{}')".format(value)
 
     # Loop through all indexes and yield them!
     indexes = getattr(model._meta, 'indexes', [])
@@ -177,14 +179,11 @@ class TableCreator:
         :param kwargs: Arguments for the given column type.
         """
         constraints = kwargs.pop('constraints', [])
-
-        new_constraints = []
         for const in constraints:
+            new_constraints = []
             if isinstance(const, str):
                 const = peewee.SQL(const)
             new_constraints.append(const)
-
-        if new_constraints:
             kwargs['constraints'] = new_constraints
 
         field_class = FIELD_TO_PEEWEE.get(coltype, peewee.CharField)
