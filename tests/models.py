@@ -38,8 +38,8 @@ class ComplexPerson(peewee.Model):
     class Meta:
         database = database
         constraints = (
-            'const1 fake',
-            'const2 fake',
+            peewee.SQL('const1 fake'),
+            peewee.Check('const2 fake'),
         )
 
 

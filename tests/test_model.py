@@ -38,6 +38,6 @@ def test_build_upgrade_from_model():
         "    table.primary_key('id')",
         "    table.char('name', max_length=5, unique=True)",
         "    table.foreign_key('organization_id', references='organization.id')",
-        "    table.add_constraint(const1 fake)",
-        "    table.add_constraint(const2 fake)",
+        "    table.add_constraint('const1 fake')",
+        "    table.add_constraint('CHECK (const2 fake)')",
     ]
