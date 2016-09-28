@@ -94,10 +94,10 @@ def build_upgrade_from_model(model):
             field_constraints = getattr(field, 'constraints', ())
             if field_constraints:
                 for const in field_constraints:
+                    value = const
                     if isinstance(const, peewee.SQL):
-                        constraints.append(const.value)
-                    else:
-                        constraints.append(const)
+                        value = const.value
+                    constraints.append(value)
             if constraints:
                 kwargs['constraints'] = constraints
 
@@ -180,8 +180,8 @@ class TableCreator:
 
         new_constraints = []
         for const in constraints:
-            if isinstnace(const, str):
-                const = peewee.Check(const)
+            if isinstance(const, str):
+                const = peewee.SQL(const)
             new_constraints.append(const)
 
         if new_constraints:
@@ -599,6 +599,7 @@ class DatabaseManager:
         except Exception as exc:
             self.database.rollback()
             self.out('ERROR:', exc)
+            raise
             return False
 
         self.out('INFO:', '{}: delete'.format(migration))
@@ -620,6 +621,7 @@ class DatabaseManager:
                     return False
         except ValueError as exc:
             self.out('ERROR:', exc)
+            raise
             return False
 
         if not self.diff:
@@ -650,6 +652,7 @@ class DatabaseManager:
                     return False
         except ValueError as exc:
             self.out('ERROR:', exc)
+            raise
             return False
 
         diff = self.db_migrations[::-1]
@@ -679,6 +682,7 @@ class DatabaseManager:
             migration = self.find_migration(migration)
         except ValueError as exc:
             self.out('ERROR:', exc)
+            raise
             return False
 
         try:
@@ -702,6 +706,7 @@ class DatabaseManager:
         except Exception as exc:
             self.database.rollback()
             self.out('ERROR:', exc)
+            raise
             return False
 
         return True
@@ -722,6 +727,7 @@ class DatabaseManager:
             self.write_migration(migration, name=name)
         except Exception as exc:
             self.out('ERROR:', exc)
+            raise
             return False
 
         self.out('INFO:', '{}: created'.format(migration))
@@ -764,6 +770,7 @@ class DatabaseManager:
             self.write_migration(migration, name=name, upgrade=up_ops, downgrade=down_ops)
         except Exception as exc:
             self.out('ERROR:', exc)
+            raise
             return False
 
         self.out('INFO:', '{}: created'.format(migration))
