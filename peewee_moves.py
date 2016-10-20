@@ -146,11 +146,62 @@ class TableCreator:
         self.name = name
         self.model = self.build_fake_model(self.name)
 
-        # Dynamically add a method for all of the field types.
-        for fieldname, fieldtype in FIELD_TO_PEEWEE.items():
-            def method(name, **kwargs):
-                self.column(fieldtype, name, **kwargs)
-            setattr(self, fieldname, method)
+    def bare(self, name, **kwargs):
+        return self.column('bare', name, **kwargs)
+
+    def biginteger(self, name, **kwargs):
+        return self.column('biginteger', name, **kwargs)
+
+    def binary(self, name, **kwargs):
+        return self.column('binary', name, **kwargs)
+
+    def blob(self, name, **kwargs):
+        return self.column('blob', name, **kwargs)
+
+    def bool(self, name, **kwargs):
+        return self.column('bool', name, **kwargs)
+
+    def char(self, name, **kwargs):
+        return self.column('char', name, **kwargs)
+
+    def date(self, name, **kwargs):
+        return self.column('date', name, **kwargs)
+
+    def datetime(self, name, **kwargs):
+        return self.column('datetime', name, **kwargs)
+
+    def decimal(self, name, **kwargs):
+        return self.column('decimal', name, **kwargs)
+
+    def double(self, name, **kwargs):
+        return self.column('double', name, **kwargs)
+
+    def fixed(self, name, **kwargs):
+        return self.column('fixed', name, **kwargs)
+
+    def float(self, name, **kwargs):
+        return self.column('float', name, **kwargs)
+
+    def int(self, name, **kwargs):
+        return self.column('int', name, **kwargs)
+
+    def integer(self, name, **kwargs):
+        return self.column('int', name, **kwargs)
+
+    def smallint(self, name, **kwargs):
+        return self.column('smallint', name, **kwargs)
+
+    def smallinteger(self, name, **kwargs):
+        return self.column('smallinteger', name, **kwargs)
+
+    def text(self, name, **kwargs):
+        return self.column('text', name, **kwargs)
+
+    def time(self, name, **kwargs):
+        return self.column('time', name, **kwargs)
+
+    def uuid(self, name, **kwargs):
+        return self.column('uuid', name, **kwargs)
 
     def build_fake_model(self, name):
         """
@@ -750,8 +801,6 @@ class DatabaseManager:
             model_list = []
             for item in model.__dict__.values():
                 if inspect.isclass(item) and issubclass(item, peewee.Model):
-                    if getattr(item, '__abstract__', False):
-                        continue
                     model_list.append(item)
             for model in peewee.sort_models_topologically(model_list):
                 self.create(model)

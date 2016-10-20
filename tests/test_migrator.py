@@ -9,9 +9,26 @@ def test_create_table(tmpdir, capsys):
 
     with manager.migrator.create_table('awesome') as table:
         table.primary_key('id')
-        table.char('first_name', index=True)
-        table.char('last_name')
-        table.add_index(('last_name', 'first_name'), unique=True)
+        table.bare('col_bare')
+        table.biginteger('col_biginteger')
+        table.binary('col_binary')
+        table.blob('col_blob')
+        table.bool('col_bool')
+        table.char('col_char')
+        table.date('col_date')
+        table.datetime('col_datetime')
+        table.decimal('col_decimal')
+        table.double('col_double')
+        table.fixed('col_fixed')
+        table.float('col_float')
+        table.int('col_int')
+        table.integer('col_integer')
+        table.smallint('col_smallint')
+        table.smallinteger('col_smallinteger')
+        table.text('col_text')
+        table.time('col_time')
+        table.uuid('col_uuid')
+        table.add_index(('col_char', 'col_integer'), unique=True)
 
 
 def test_drop_table(tmpdir, capsys):
@@ -84,3 +101,14 @@ def test_execute_sql(tmpdir, capsys):
     manager.migrator.execute_sql('select * from awesome')
     with pytest.raises(peewee.OperationalError):
         manager.migrator.execute_sql('select * from notable')
+
+
+def test_str_constraints(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+
+    with manager.migrator.create_table('awesome') as table:
+        table.primary_key('id')
+        table.char('username', constraints=[
+            "check (username in ('tim', 'bob'))",
+            peewee.Check("username in ('tim', 'bob')")
+        ])
