@@ -112,3 +112,27 @@ def test_str_constraints(tmpdir, capsys):
             "check (username in ('tim', 'bob'))",
             peewee.Check("username in ('tim', 'bob')")
         ])
+
+
+def test_foreign_key(tmpdir, capsys):
+    manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
+
+    with manager.migrator.create_table('basic') as table:
+        table.primary_key('id')
+        table.char('username')
+
+    with manager.migrator.create_table('related1') as table:
+        table.primary_key('id')
+        table.foreign_key('basic_id', 'basic')
+
+    with manager.migrator.create_table('related2') as table:
+        table.primary_key('id')
+        table.foreign_key('basic_id', 'basic.id')
+
+    with manager.migrator.create_table('related3') as table:
+        table.primary_key('id')
+        table.foreign_key('basic', 'basic')
+
+    with manager.migrator.create_table('related4') as table:
+        table.primary_key('id')
+        table.foreign_key('basic', 'basic.id')
