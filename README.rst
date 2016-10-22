@@ -41,20 +41,22 @@ Here's a quick teaser of what you can do with peewee-moves:
 
 .. code:: console
 
-    $ ./manage.py db create -m app.models.Category
+    $ export FLASK_APP=myflaskapp
+
+    $ flask db create -m app.models.Category
     INFO: created migration 0001_create_table_category
 
-    $ ./manage.py db revision -n "do something"
+    $ flask db revision -n "do something"
     INFO: created migration 0002_do_something
 
-    $ ./manage.py db upgrade
+    $ flask db upgrade
     INFO: 0001_create_table_category: upgrade
     INFO: 0002_do_something: upgrade
 
-    $ ./manage.py db downgrade
+    $ flask db downgrade
     INFO: 0002_do_something: downgrade
 
-    $ ./manage.py db status
+    $ flask db status
     INFO: 0001_create_table_category: applied
     INFO: 0002_do_something: pending
 
