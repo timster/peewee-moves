@@ -43,10 +43,10 @@ Here's a quick teaser of what you can do with peewee-moves:
 
     $ export FLASK_APP=myflaskapp
 
-    $ flask db create -m app.models.Category
+    $ flask db create app.models.Category
     INFO: created migration 0001_create_table_category
 
-    $ flask db revision -n "do something"
+    $ flask db revision "do something"
     INFO: created migration 0002_do_something
 
     $ flask db upgrade
