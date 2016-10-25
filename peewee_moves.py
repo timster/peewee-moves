@@ -16,6 +16,8 @@ try:
 except ImportError:
     EXTENSION_CLICK = False
 
+print('EXTENSION_CLICK', EXTENSION_CLICK)
+
 
 FIELD_TO_PEEWEE = {
     'bare': peewee.BareField,
@@ -615,8 +617,8 @@ class DatabaseManager:
         """
         driver = self.database.__class__.__name__
         database = self.database.database
-        self.out('INFO:', 'driver =', driver)
-        self.out('INFO:', 'database =', database)
+        self.out('driver: ', driver)
+        self.out('database: ', database)
 
     def status(self):
         """
@@ -626,11 +628,11 @@ class DatabaseManager:
         :rtype: bool
         """
         if not self.migration_files:
-            self.out('INFO:', 'no migrations found')
+            self.out('no migrations found')
             return
         for name in self.migration_files:
-            status = 'applied' if name in self.db_migrations else 'pending'
-            self.out('INFO:', '{}: {}'.format(name, status))
+            status = 'x' if name in self.db_migrations else ' '
+            self.out('[{}] {}'.format(status, name))
 
     def delete(self, migration):
         """
@@ -651,7 +653,7 @@ class DatabaseManager:
             self.out('ERROR:', exc)
             return False
 
-        self.out('INFO:', '{}: delete'.format(migration))
+        self.out('deleted: {}'.format(migration))
         return True
 
     def upgrade(self, target=None):
@@ -666,14 +668,14 @@ class DatabaseManager:
             if target:
                 target = self.find_migration(target)
                 if target in self.db_migrations:
-                    self.out('INFO:', '{}: already applied'.format(target))
+                    self.out('already applied: {}'.format(target))
                     return False
         except ValueError as exc:
             self.out('ERROR:', exc)
             return False
 
         if not self.diff:
-            self.out('INFO:', 'all migrations applied!')
+            self.out('all migrations applied!')
             return False
 
         for name in self.diff:
@@ -696,7 +698,7 @@ class DatabaseManager:
             if target:
                 target = self.find_migration(target)
                 if target not in self.db_migrations:
-                    self.out('INFO:', '{}: not yet applied'.format(target))
+                    self.out('not yet applied: {}'.format(target))
                     return False
         except ValueError as exc:
             self.out('ERROR:', exc)
@@ -705,7 +707,7 @@ class DatabaseManager:
         diff = self.db_migrations[::-1]
 
         if not diff:
-            self.out('INFO:', 'migrations not yet applied!')
+            self.out('migrations not yet applied!')
             return False
 
         for name in diff:
@@ -732,7 +734,7 @@ class DatabaseManager:
             return False
 
         try:
-            self.out('INFO:', '{}: {}'.format(migration, direction))
+            self.out('{}: {}'.format(direction, migration))
             with self.database.transaction():
                 scope = {
                     '__file__': self.get_filename(migration),
@@ -776,7 +778,7 @@ class DatabaseManager:
             self.out('ERROR:', exc)
             return False
 
-        self.out('INFO:', '{}: created'.format(migration))
+        self.out('created: {}'.format(migration))
         return True
 
     def create(self, modelstr):
@@ -793,7 +795,7 @@ class DatabaseManager:
         if isinstance(modelstr, str):
             model = pydoc.locate(modelstr)
             if not model:
-                self.out('INFO:', 'could not import: {}'.format(modelstr))
+                self.out('could not import: {}'.format(modelstr))
                 return False
 
         # If it's a module, we need to loop through all the models in it.
@@ -816,7 +818,7 @@ class DatabaseManager:
             self.out('ERROR:', exc)
             return False
 
-        self.out('INFO:', '{}: created'.format(migration))
+        self.out('created: {}'.format(migration))
         return True
 
 
