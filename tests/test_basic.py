@@ -59,7 +59,7 @@ def test_revision_error(tmpdir, capsys):
 
     manager.revision('Bad Characters: \0')
     out, err = capsys.readouterr()
-    assert out == 'ERROR: embedded null byte\n'
+    assert 'ERROR: embedded' in out
 
 
 def test_find_migration(tmpdir):
