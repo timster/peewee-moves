@@ -16,8 +16,6 @@ try:
 except ImportError:
     EXTENSION_CLICK = False
 
-print('EXTENSION_CLICK', EXTENSION_CLICK)
-
 
 FIELD_TO_PEEWEE = {
     'bare': peewee.BareField,
