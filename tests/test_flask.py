@@ -1,3 +1,6 @@
+import imp
+import sys
+
 from click.testing import CliRunner
 from flask import Flask
 from flask.cli import ScriptInfo
@@ -14,6 +17,21 @@ flaskapp = Flask(__name__)
 flaskapp.config['DATABASE'] = 'sqlite:///:memory:'
 
 runner = CliRunner()
+
+
+def test_missing_flask(mocker):
+    import peewee_moves
+
+    # flask is installed, so EXTENSION_CLICK is True
+    imp.reload(peewee_moves)
+    assert peewee_moves.EXTENSION_CLICK
+
+    # remove flask and reload, so EXTENSION_CLICK is False
+    mocker.patch.dict(sys.modules)
+    sys.modules['flask'] = None
+    imp.reload(peewee_moves)
+
+    assert not peewee_moves.EXTENSION_CLICK
 
 
 def test_info(tmpdir):

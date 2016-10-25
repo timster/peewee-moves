@@ -35,6 +35,6 @@ test:
 	py.test
 
 testcov:
-	py.test --cov=.
+	py.test --cov=peewee_moves.py
 	coverage html --directory=.covhtml
 	open .covhtml/index.html

@@ -3,6 +3,10 @@ import peewee
 database = peewee.SqliteDatabase(':memory:')
 
 
+class NotModel:
+    pass
+
+
 class BasicFields(peewee.Model):
     field1 = peewee.CharField()
     field2 = peewee.CharField()
