@@ -822,10 +822,10 @@ class DatabaseManager:
 
 if EXTENSION_CLICK:
 
-    def get_database_manager():
-        """Return a DatabaseManager for the current Flask application."""
-        directory = os.path.join(current_app.root_path, 'migrations')
-        return DatabaseManager(current_app.config['DATABASE'], directory=directory)
+    def get_database_manager(app):
+        """Return a DatabaseManager for the given Flask application."""
+        directory = os.path.join(app.root_path, 'migrations')
+        return DatabaseManager(app.config['DATABASE'], directory=directory)
 
     @click.group()
     def command():
@@ -836,44 +836,44 @@ if EXTENSION_CLICK:
     @cli.with_appcontext
     def create(model):
         """Create a migration based on an existing model."""
-        get_database_manager().create(model)
+        get_database_manager(current_app).create(model)
 
     @command.command()
     @cli.with_appcontext
     def info():
         """Show information about the current database."""
-        get_database_manager().info()
+        get_database_manager(current_app).info()
 
     @command.command()
     @cli.with_appcontext
     def status():
         """Show information about the database."""
-        get_database_manager().status()
+        get_database_manager(current_app).status()
 
     @command.command()
     @click.argument('name')
     @cli.with_appcontext
     def revision(name):
         """Create a blank migration file."""
-        get_database_manager().revision(name)
+        get_database_manager(current_app).revision(name)
 
     @command.command()
     @click.argument('target', default='')
     @cli.with_appcontext
     def upgrade(target):
         """Run database upgrades."""
-        get_database_manager().upgrade(target)
+        get_database_manager(current_app).upgrade(target)
 
     @command.command()
     @click.argument('target', default='')
     @cli.with_appcontext
     def downgrade(target):
         """Run database downgrades."""
-        get_database_manager().downgrade(target)
+        get_database_manager(current_app).downgrade(target)
 
     @command.command()
     @click.argument('target', default='')
     @cli.with_appcontext
     def delete(target):
         """Delete the target migration from the filesystem and database."""
-        get_database_manager().delete(target)
+        get_database_manager(current_app).delete(target)
