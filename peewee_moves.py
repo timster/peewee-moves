@@ -278,6 +278,12 @@ class TableCreator:
                 database = peewee.Proxy()
                 db_table = rel_table
 
+        # If the to_field is not "id" then add it to the DummyRelated class.
+        if rel_column != 'id':
+            rel_field = peewee.IntegerField()
+            rel_field.add_to_class(DummyRelated, rel_column)
+            
+        # Then add the foreign key to that field.
         field = peewee.ForeignKeyField(DummyRelated, to_field=rel_column, **kwargs)
         field.add_to_class(self.model, name)
 
