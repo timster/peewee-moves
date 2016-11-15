@@ -265,9 +265,6 @@ class TableCreator:
             You can also provide "on_delete" and "on_update" to add constraints.
         :return: None
         """
-        if name.endswith('_id'):
-            name = name[:-3]
-
         try:
             rel_table, rel_column = references.split('.', 1)
         except ValueError:
@@ -282,9 +279,8 @@ class TableCreator:
         if rel_column != 'id':
             rel_field = peewee.IntegerField()
             rel_field.add_to_class(DummyRelated, rel_column)
-            
-        # Then add the foreign key to that field.
-        field = peewee.ForeignKeyField(DummyRelated, to_field=rel_column, **kwargs)
+
+        field = peewee.ForeignKeyField(DummyRelated, db_column=name, to_field=rel_column, **kwargs)
         field.add_to_class(self.model, name)
 
     def add_index(self, columns, unique=False):
