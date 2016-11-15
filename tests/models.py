@@ -52,3 +52,10 @@ class HasCheckConstraint(peewee.Model):
 
     class Meta:
         database = database
+
+
+class RelatesToName(peewee.Model):
+    person = peewee.ForeignKeyField(Person, db_column="person_name", to_field='name')
+
+    class Meta:
+        database = database

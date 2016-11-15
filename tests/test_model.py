@@ -48,3 +48,13 @@ def test_build_upgrade_from_model():
         "    table.add_constraint('const1 fake')",
         "    table.add_constraint('CHECK (const2 fake)')",
     ]
+
+
+def test_non_id_foreign_key_output():
+    output = build_upgrade_from_model(models.RelatesToName)
+    output = list(output)
+
+    assert output == [
+        "with migrator.create_table('relatestoname') as table:",
+        "    table.primary_key('id')",
+        "    table.foreign_key('person_name', references='person.name')"]

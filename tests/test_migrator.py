@@ -136,3 +136,7 @@ def test_foreign_key(tmpdir, capsys):
     with manager.migrator.create_table('related4') as table:
         table.primary_key('id')
         table.foreign_key('basic', 'basic.id')
+
+    with manager.migrator.create_table('related5') as table:
+        table.primary_key('id')
+        table.foreign_key('basic', 'basic.username')
