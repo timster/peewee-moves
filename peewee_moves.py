@@ -84,6 +84,10 @@ def build_upgrade_from_model(model):
             other_table = field.rel_model._meta.db_table
             other_col = field.to_field.db_column
             kwargs = {'references': '{}.{}'.format(other_table, other_col)}
+            if field.on_delete:
+                kwargs['on_delete'] = field.on_delete
+            if field.on_update:
+                kwargs['on_update'] = field.on_update
         else:
             kwargs = {
                 key: getattr(field, key) for key in FIELD_KWARGS if getattr(field, key, None)

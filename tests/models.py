@@ -55,7 +55,12 @@ class HasCheckConstraint(peewee.Model):
 
 
 class RelatesToName(peewee.Model):
-    person = peewee.ForeignKeyField(Person, db_column="person_name", to_field='name')
+    person = peewee.ForeignKeyField(
+        Person,
+        db_column="person_name",
+        to_field='name',
+        on_update='CASCADE',
+        on_delete='SET NULL')
 
     class Meta:
         database = database

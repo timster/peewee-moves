@@ -57,4 +57,4 @@ def test_non_id_foreign_key_output():
     assert output == [
         "with migrator.create_table('relatestoname') as table:",
         "    table.primary_key('id')",
-        "    table.foreign_key('person_name', references='person.name')"]
+        "    table.foreign_key('person_name', on_delete='SET NULL', on_update='CASCADE', references='person.name')"]
