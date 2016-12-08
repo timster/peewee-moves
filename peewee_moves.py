@@ -234,12 +234,12 @@ class TableCreator:
         :param kwargs: Arguments for the given column type.
         """
         constraints = kwargs.pop('constraints', [])
+        new_constraints = []
         for const in constraints:
-            new_constraints = []
             if isinstance(const, str):
                 const = peewee.SQL(const)
             new_constraints.append(const)
-            kwargs['constraints'] = new_constraints
+        kwargs['constraints'] = new_constraints
 
         field_class = FIELD_TO_PEEWEE.get(coltype, peewee.CharField)
         field_class(**kwargs).add_to_class(self.model, name)
