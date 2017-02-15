@@ -621,8 +621,12 @@ class DatabaseManager:
         """
         driver = self.database.__class__.__name__
         database = self.database.database
-        self.out('driver: ', driver)
-        self.out('database: ', database)
+        kwargs = self.database.connect_kwargs
+        self.out('driver: {}'.format(driver))
+        self.out('database: {}'.format(database))
+        self.out('arguments:')
+        for key, value in kwargs.items():
+            self.out('  {}: {}'.format(key, value))
 
     def status(self):
         """
