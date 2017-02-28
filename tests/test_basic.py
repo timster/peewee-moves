@@ -39,7 +39,7 @@ def test_info(tmpdir, capsys):
 
     manager.info()
     out, err = capsys.readouterr()
-    assert out == 'driver:  SqliteDatabase\ndatabase:  :memory:\n'
+    assert out == 'driver: SqliteDatabase\ndatabase: :memory:\narguments:\n'
 
 
 def test_revision(tmpdir, capsys):
