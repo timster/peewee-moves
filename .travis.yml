@@ -4,7 +4,12 @@ python:
   - "3.3"
   - "3.4"
   - "3.5"
+  - "3.6"
+env:
+  - PEEWEE_VERSION=2.8.2
+  - PEEWEE_VERSION=2.8.8
 install:
+  - "pip install peewee==$PEEWEE_VERSION"
   - "pip install python-coveralls==2.7.0"
   - "pip install -r requirements-test.txt"
 before_script:
