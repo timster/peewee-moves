@@ -54,6 +54,17 @@ class HasCheckConstraint(peewee.Model):
         database = database
 
 
+class HasUniqueForeignKey(peewee.Model):
+    age = peewee.IntegerField()
+    person = peewee.ForeignKeyField(Person, db_column="person_name", to_field='name')
+
+    class Meta:
+        database = database
+        indexes = (
+            (('age', 'person'), True),
+        )
+
+
 class RelatesToName(peewee.Model):
     person = peewee.ForeignKeyField(
         Person,
