@@ -1,12 +1,13 @@
-from contextlib import contextmanager
-from datetime import datetime
 import inspect
+import logging
 import os
 import pydoc
+from contextlib import contextmanager
+from datetime import datetime
 
+import peewee
 from playhouse.db_url import connect as url_connect
 from playhouse.migrate import SchemaMigrator
-import peewee
 
 try:
     import click
@@ -16,6 +17,9 @@ try:
 except ImportError:
     EXTENSION_CLICK = False
 
+LOGGER = logging.getLogger('peewee_moves')
+LOGGER.setLevel(logging.DEBUG)
+LOGGER.addHandler(logging.StreamHandler())
 
 FIELD_TO_PEEWEE = {
     'bare': peewee.BareField,
@@ -450,7 +454,7 @@ class Migrator:
 class DatabaseManager:
     ext = '.py'
 
-    def __init__(self, database, table_name='migration_history', directory='migrations', out=print):
+    def __init__(self, database, table_name='migration_history', directory='migrations'):
         """
         Initialize a DatabaseManager with the given options.
 
@@ -458,7 +462,6 @@ class DatabaseManager:
         :param table_name: Table name to hold migrations (default migration_history).
         :param directory: Directory to store migrations (default migrations).
         """
-        self.out = out
         self.directory = str(directory)
         self.database = self.load_database(database)
         self.migrator = Migrator(self.database)
@@ -622,11 +625,11 @@ class DatabaseManager:
         driver = self.database.__class__.__name__
         database = self.database.database
         kwargs = self.database.connect_kwargs
-        self.out('driver: {}'.format(driver))
-        self.out('database: {}'.format(database))
-        self.out('arguments:')
+        LOGGER.info('driver: {}'.format(driver))
+        LOGGER.info('database: {}'.format(database))
+        LOGGER.info('arguments:')
         for key, value in kwargs.items():
-            self.out('  {}: {}'.format(key, value))
+            LOGGER.info('  {}: {}'.format(key, value))
 
     def status(self):
         """
@@ -636,11 +639,11 @@ class DatabaseManager:
         :rtype: bool
         """
         if not self.migration_files:
-            self.out('no migrations found')
+            LOGGER.info('no migrations found')
             return
         for name in self.migration_files:
             status = 'x' if name in self.db_migrations else ' '
-            self.out('[{}] {}'.format(status, name))
+            LOGGER.info('[{}] {}'.format(status, name))
 
     def delete(self, migration):
         """
@@ -658,10 +661,10 @@ class DatabaseManager:
                 cmd.execute()
         except Exception as exc:
             self.database.rollback()
-            self.out('ERROR:', exc)
+            LOGGER.error(exc)
             return False
 
-        self.out('deleted: {}'.format(migration))
+        LOGGER.info('deleted: {}'.format(migration))
         return True
 
     def upgrade(self, target=None):
@@ -676,14 +679,14 @@ class DatabaseManager:
             if target:
                 target = self.find_migration(target)
                 if target in self.db_migrations:
-                    self.out('already applied: {}'.format(target))
+                    LOGGER.info('already applied: {}'.format(target))
                     return False
         except ValueError as exc:
-            self.out('ERROR:', exc)
+            LOGGER.error(exc)
             return False
 
         if not self.diff:
-            self.out('all migrations applied!')
+            LOGGER.info('all migrations applied!')
             return False
 
         for name in self.diff:
@@ -706,16 +709,16 @@ class DatabaseManager:
             if target:
                 target = self.find_migration(target)
                 if target not in self.db_migrations:
-                    self.out('not yet applied: {}'.format(target))
+                    LOGGER.info('not yet applied: {}'.format(target))
                     return False
         except ValueError as exc:
-            self.out('ERROR:', exc)
+            LOGGER.error(exc)
             return False
 
         diff = self.db_migrations[::-1]
 
         if not diff:
-            self.out('migrations not yet applied!')
+            LOGGER.info('migrations not yet applied!')
             return False
 
         for name in diff:
@@ -738,11 +741,11 @@ class DatabaseManager:
         try:
             migration = self.find_migration(migration)
         except ValueError as exc:
-            self.out('ERROR:', exc)
+            LOGGER.error(exc)
             return False
 
         try:
-            self.out('{}: {}'.format(direction, migration))
+            LOGGER.info('{}: {}'.format(direction, migration))
             with self.database.transaction():
                 scope = {
                     '__file__': self.get_filename(migration),
@@ -763,7 +766,7 @@ class DatabaseManager:
 
         except Exception as exc:
             self.database.rollback()
-            self.out('ERROR:', exc)
+            LOGGER.error(exc)
             return False
 
         return True
@@ -783,10 +786,10 @@ class DatabaseManager:
             migration = self.next_migration(name)
             self.write_migration(migration, name=name)
         except Exception as exc:
-            self.out('ERROR:', exc)
+            LOGGER.error(exc)
             return False
 
-        self.out('created: {}'.format(migration))
+        LOGGER.info('created: {}'.format(migration))
         return True
 
     def create(self, modelstr):
@@ -803,7 +806,7 @@ class DatabaseManager:
         if isinstance(modelstr, str):
             model = pydoc.locate(modelstr)
             if not model:
-                self.out('could not import: {}'.format(modelstr))
+                LOGGER.info('could not import: {}'.format(modelstr))
                 return False
 
         # If it's a module, we need to loop through all the models in it.
@@ -826,10 +829,10 @@ class DatabaseManager:
             down_ops = build_downgrade_from_model(model)
             self.write_migration(migration, name=name, upgrade=up_ops, downgrade=down_ops)
         except Exception as exc:
-            self.out('ERROR:', exc)
+            LOGGER.error(exc)
             return False
 
-        self.out('created: {}'.format(migration))
+        LOGGER.info('created: {}'.format(migration))
         return True
 
 

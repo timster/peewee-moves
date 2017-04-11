@@ -4,7 +4,7 @@ import peewee
 from peewee_moves import DatabaseManager
 
 
-def test_create_table(tmpdir, capsys):
+def test_create_table(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -31,7 +31,7 @@ def test_create_table(tmpdir, capsys):
         table.add_index(('col_char', 'col_integer'), unique=True)
 
 
-def test_drop_table(tmpdir, capsys):
+def test_drop_table(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -40,7 +40,7 @@ def test_drop_table(tmpdir, capsys):
     manager.migrator.drop_table('awesome')
 
 
-def test_add_drop_column(tmpdir, capsys):
+def test_add_drop_column(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -50,7 +50,7 @@ def test_add_drop_column(tmpdir, capsys):
     manager.migrator.drop_column('awesome', 'name')
 
 
-def test_rename_column(tmpdir, capsys):
+def test_rename_column(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -60,7 +60,7 @@ def test_rename_column(tmpdir, capsys):
     manager.migrator.rename_column('awesome', 'name', 'newname')
 
 
-def test_rename_table(tmpdir, capsys):
+def test_rename_table(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -69,7 +69,7 @@ def test_rename_table(tmpdir, capsys):
     manager.migrator.rename_table('awesome', 'more_awesome')
 
 
-def test_not_null(tmpdir, capsys):
+def test_not_null(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -80,7 +80,7 @@ def test_not_null(tmpdir, capsys):
     manager.migrator.drop_not_null('awesome', 'name')
 
 
-def test_index(tmpdir, capsys):
+def test_index(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -91,7 +91,7 @@ def test_index(tmpdir, capsys):
     manager.migrator.drop_index('awesome', 'awesome_name')
 
 
-def test_execute_sql(tmpdir, capsys):
+def test_execute_sql(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -103,7 +103,7 @@ def test_execute_sql(tmpdir, capsys):
         manager.migrator.execute_sql('select * from notable')
 
 
-def test_str_constraints(tmpdir, capsys):
+def test_str_constraints(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('awesome') as table:
@@ -114,7 +114,7 @@ def test_str_constraints(tmpdir, capsys):
         ])
 
 
-def test_foreign_key(tmpdir, capsys):
+def test_foreign_key(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     with manager.migrator.create_table('basic') as table:

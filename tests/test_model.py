@@ -4,37 +4,33 @@ from peewee_moves import build_upgrade_from_model
 from tests import models
 
 
-def test_create_import(tmpdir, capsys):
+def test_create_import(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.create('Person')
 
-    out, err = capsys.readouterr()
-    assert out == 'could not import: Person\n'
+    assert 'could not import: Person' in caplog.text
 
 
-def test_create_error(tmpdir, capsys):
+def test_create_error(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.create(models.NotModel)
-    out, err = capsys.readouterr()
-    assert out == "ERROR: type object 'NotModel' has no attribute '_meta'\n"
+    assert "type object 'NotModel' has no attribute '_meta'" in caplog.text
 
 
-def test_create(tmpdir, capsys):
+def test_create(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.create(models.Person)
-    out, err = capsys.readouterr()
-    assert out == 'created: 0001_create_table_person\n'
+    assert 'created: 0001_create_table_person' in caplog.text
 
 
-def test_create_module(tmpdir, capsys):
+def test_create_module(tmpdir, caplog):
     manager = DatabaseManager(models.database, directory=tmpdir)
     manager.create(models)
-    out, err = capsys.readouterr()
-    assert 'created: 0001_create_table_basicfields' in out
-    assert 'created: 0002_create_table_hascheckconstraint' in out
-    assert 'created: 0003_create_table_organization' in out
-    assert 'created: 0004_create_table_complexperson' in out
-    assert 'created: 0005_create_table_person' in out
+    assert 'created: 0001_create_table_basicfields' in caplog.text
+    assert 'created: 0002_create_table_hascheckconstraint' in caplog.text
+    assert 'created: 0003_create_table_organization' in caplog.text
+    assert 'created: 0004_create_table_complexperson' in caplog.text
+    assert 'created: 0005_create_table_person' in caplog.text
 
 
 def test_build_upgrade_from_model():
