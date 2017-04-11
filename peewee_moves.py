@@ -811,6 +811,9 @@ class DatabaseManager:
             model_list = []
             for item in model.__dict__.values():
                 if inspect.isclass(item) and issubclass(item, peewee.Model):
+                    # Don't create migration file for imported models.
+                    if model.__name__ != item.__module__:
+                        continue
                     model_list.append(item)
             for model in peewee.sort_models_topologically(model_list):
                 self.create(model)
