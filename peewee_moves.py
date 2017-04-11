@@ -131,7 +131,11 @@ def build_upgrade_from_model(model):
     indexes = getattr(model._meta, 'indexes', [])
     if indexes:
         for columns, unique in indexes:
-            yield "    table.add_index({}, unique={})".format(columns, unique)
+            index_cols = []
+            for colname in columns:
+                model_field = model._meta.fields.get(colname)
+                index_cols.append(model_field and model_field.db_column or colname)
+            yield "    table.add_index({}, unique={})".format(tuple(index_cols), unique)
 
 
 class MigrationHistory(peewee.Model):
@@ -285,6 +289,7 @@ class TableCreator:
 
         # If the to_field is not "id" then add it to the DummyRelated class.
         if rel_column != 'id':
+            # TODO: might not be related to an integer field :/
             rel_field = peewee.IntegerField()
             rel_field.add_to_class(DummyRelated, rel_column)
 
