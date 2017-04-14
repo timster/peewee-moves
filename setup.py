@@ -13,7 +13,7 @@ with open(path.join(root_dir, 'requirements.txt'), encoding='utf-8') as f:
 
 setup(
     name='peewee-moves',
-    version='1.6.1',
+    version='1.6.2',
 
     description='Simple and flexible migration manager for Peewee ORM.',
     long_description=long_description,
