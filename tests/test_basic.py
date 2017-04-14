@@ -54,7 +54,7 @@ def test_revision_error(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
     manager.revision('Bad Characters: \0')
-    assert 'embedded null byte' in caplog.text
+    assert 'embedded' in caplog.text
 
 
 def test_find_migration(tmpdir):
