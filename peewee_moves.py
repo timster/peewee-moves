@@ -24,32 +24,32 @@ LOGGER = logging.getLogger('peewee_moves')
 LOGGER.setLevel(logging.DEBUG)
 LOGGER.addHandler(LOG_HANDLER)
 
-FIELD_TO_PEEWEE = {
-    'bare': peewee.BareField,
-    'biginteger': peewee.BigIntegerField,
-    'binary': peewee.BlobField,
-    'blob': peewee.BlobField,
-    'bool': peewee.BooleanField,
-    'char': peewee.CharField,
-    'date': peewee.DateField,
-    'datetime': peewee.DateTimeField,
-    'decimal': peewee.DecimalField,
-    'double': peewee.DoubleField,
-    'fixed': peewee.FixedCharField,
-    'float': peewee.FloatField,
-    'int': peewee.IntegerField,
-    'integer': peewee.IntegerField,
-    'smallint': peewee.SmallIntegerField,
-    'smallinteger': peewee.SmallIntegerField,
-    'text': peewee.TextField,
-    'time': peewee.TimeField,
-    'uuid': peewee.UUIDField,
+PEEWEE_TO_FIELD = {
+    peewee.BareField: 'bare',
+    peewee.BigIntegerField: 'biginteger',
+    peewee.BlobField: 'binary',
+    peewee.BlobField: 'blob',
+    peewee.BooleanField: 'bool',
+    peewee.CharField: 'char',
+    peewee.DateField: 'date',
+    peewee.DateTimeField: 'datetime',
+    peewee.DecimalField: 'decimal',
+    peewee.DoubleField: 'double',
+    peewee.FixedCharField: 'fixed',
+    peewee.FloatField: 'float',
+    peewee.ForeignKeyField: 'foreign_key',
+    peewee.IntegerField: 'int',
+    peewee.PrimaryKeyField: 'primary_key',
+    peewee.SmallIntegerField: 'smallint',
+    peewee.TextField: 'text',
+    peewee.TimeField: 'time',
+    peewee.TimestampField: 'int',
+    peewee.UUIDField: 'uuid',
 }
 
-PEEWEE_TO_FIELD = {value: key for key, value in FIELD_TO_PEEWEE.items()}
-PEEWEE_TO_FIELD[peewee.PrimaryKeyField] = 'primary_key'
-PEEWEE_TO_FIELD[peewee.ForeignKeyField] = 'foreign_key'
-PEEWEE_TO_FIELD[peewee.TimestampField] = 'int'
+FIELD_TO_PEEWEE = {value: key for key, value in PEEWEE_TO_FIELD.items()}
+FIELD_TO_PEEWEE['integer'] = peewee.IntegerField
+FIELD_TO_PEEWEE['smallinteger'] = peewee.SmallIntegerField
 
 FIELD_KWARGS = ('null', 'index', 'unique', 'sequence', 'max_length', 'max_digits', 'decimal_places')
 

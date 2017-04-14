@@ -63,6 +63,6 @@ def test_index_field_names():
     assert output == [
         "with migrator.create_table('hasuniqueforeignkey') as table:",
         "    table.primary_key('id')",
-        "    table.integer('age')",
+        "    table.int('age')",
         "    table.foreign_key('person_name', references='person.name')",
         "    table.add_index(('age', 'person_name'), unique=True)"]
