@@ -695,13 +695,15 @@ class DatabaseManager:
 
         if not self.diff:
             LOGGER.info('all migrations applied!')
-            return False
+            return True
 
         for name in self.diff:
             success = self.run_migration(name, 'upgrade')
-            # If it didn't work, don't try any more.
+            # If it didn't work, don't try any more and exit.
+            if not success:
+                return False
             # Or if we are at the end of the line, don't run anymore.
-            if not success or (target and target == name):
+            if target and target == name:
                 break
         return True
 
@@ -732,6 +734,8 @@ class DatabaseManager:
         for name in diff:
             success = self.run_migration(name, 'downgrade')
             # If it didn't work, don't try any more.
+            if not success:
+                return False
             # Or if we are at the end of the line, don't run anymore.
             if not success or (not target or target == name):
                 break
