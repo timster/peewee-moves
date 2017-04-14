@@ -17,9 +17,12 @@ try:
 except ImportError:
     EXTENSION_CLICK = False
 
+LOG_HANDLER = logging.StreamHandler()
+LOG_HANDLER.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+
 LOGGER = logging.getLogger('peewee_moves')
 LOGGER.setLevel(logging.DEBUG)
-LOGGER.addHandler(logging.StreamHandler())
+LOGGER.addHandler(LOG_HANDLER)
 
 FIELD_TO_PEEWEE = {
     'bare': peewee.BareField,
