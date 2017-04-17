@@ -1,14 +1,9 @@
-Usage
-#####
-
-.. contents::
-
 Direct Usage
 ============
 
 The main entry point is the `DatabaseManager` class which accepts the following parameters:
 
-- database: location of database (URL string, dictionary, or `peewee.Database` instance).
+- database: location of database (URL string, dictionary, or ``peewee.Database`` instance).
 - table_name: table name to store migration history (default: migration_history)
 - directory: directory to store migration files (default: migrations)
 
@@ -26,16 +21,16 @@ From there, you can call methods to manage and run migration files.
 New Migration
 -------------
 
-This will create a blank migration file with the next ID and the default name of "automigration"
+This will create a blank migration file with the next ID and the default name of "auto migration"
 or whatever name you provide
 
 .. code:: console
 
     >>> manager.revision()
-    INFO: created migration 0001_automigration
+    created: INFO: 0001_auto_migration
 
     >>> manager.revision('custom name')
-    INFO: created migration 0002_custom_name
+    created: INFO: 0002_custom_name
 
 Database Upgrade
 ----------------
@@ -47,11 +42,11 @@ migrations will run.
 .. code:: console
 
     >>> manager.upgrade('0001')
-    INFO: 0001_automigration: upgrade
+    INFO: upgrade: 0001_auto_migration
 
     >>> manager.upgrade()
-    INFO: 0002_custom_name: upgrade
-    INFO: 0003_another_migration: upgrade
+    INFO: upgrade: 0002_custom_name
+    INFO: upgrade: 0003_another_migration
 
 Database Downgrade
 ------------------
@@ -63,22 +58,22 @@ specified, only the most recent migration will be downgraded.
 .. code:: console
 
     >>> manager.downgrade()
-    INFO: 0003_another_migration: downgrade
+    INFO: downgrade: 0003_another_migration
 
     >>> manager.downgrade('0001')
-    INFO: 0002_custom_name: downgrade
-    INFO: 0001_automigration: downgrade
+    INFO: downgrade: 0002_custom_name
+    INFO: downgrade: 0001_auto_migration
 
 Delete Migration
 ----------------
 
-This will remove a migration from the database and the filesystem, as if it never happened. You
-might never need this, but it could be useful in some circumstances.
+This will remove a migration from the database and the filesystem, as if it never happened.
+You might never need this, but it could be useful in some circumstances.
 
 .. code:: console
 
     >>> manager.delete('0003')
-    INFO: 0003_another_migration: delete
+    INFO: deleted: 0003_another_migration
 
 Migration Status
 ----------------
@@ -88,9 +83,9 @@ This will simply show the status of each migration file so you can see which one
 .. code:: console
 
     >>> manager.status()
-    INFO: 0001_automigration: applied
-    INFO: 0002_custom_name: applied
-    INFO: 0003_another_migration: pending
+    INFO: [x] 0001_auto_migration
+    INFO: [x] 0002_custom_name
+    INFO: [ ] 0003_another_migration
 
 Automagic Migration Creation
 ----------------------------
@@ -105,23 +100,21 @@ Let's say you have the following two models defined in `models.py`:
     import peewee
 
     class Group(peewee.Model):
-        code = peewee.IntegerField()
+        code = peewee.IntegerField(unique=True)
         name = peewee.CharField(max_length=250)
 
         class Meta:
             db_table = 'auth_groups'
-            indexes = (
-                (('code', 'category_id'), True),
-            )
 
     class User(peewee.Model):
-        code = peewee.IntegerField(unique=True)
         name = peewee.CharField(max_length=250)
-
         group = peewee.ForeignKeyField(Group, related_name='users')
 
         class Meta:
             db_table = 'auth_users'
+            indexes = (
+                (('name', 'group'), True),
+            )
 
 Running the following command will create the migration file necessary to upgrade/downgrade the
 Group model.
@@ -129,15 +122,15 @@ Group model.
 .. code:: python
 
     >>> migrator.create('models.Group')
-    INFO: 0001_create_table_auth_groups: created
+    INFO: created: 0001_create_table_auth_groups
 
 You can also pass a module to create migration files for all models within:
 
 .. code:: python
 
     >>> migrator.create('models')
-    INFO: 0001_create_table_auth_groups: created
-    INFO: 0002_create_table_auth_users: created
+    INFO: created: 0001_create_table_auth_groups
+    INFO: created: 0002_create_table_auth_users
 
 Let's look at both those files:
 
@@ -148,9 +141,8 @@ Let's look at both those files:
     def upgrade(migrator):
         with migrator.create_table('auth_groups') as table:
             table.primary_key('id')
-            table.integer('code')
+            table.int('code', unique=True)
             table.char('name', max_length=250)
-            table.add_index(('code', 'name'), unique=True)
 
     def downgrade(migrator):
         migrator.drop_table('auth_groups')
@@ -162,9 +154,9 @@ Let's look at both those files:
     def upgrade(migrator):
         with migrator.create_table('auth_users') as table:
             table.primary_key('id')
-            table.integer('code', unique=True)
             table.char('name', max_length=250)
-            table.foreign_key('group_id', references='auth_groups.id')
+            table.foreign_key('int', 'group_id', references='auth_groups.id')
+            table.add_index(('name', 'group_id'), unique=True)
 
     def downgrade(migrator):
         migrator.drop_table('auth_users')
@@ -180,12 +172,12 @@ This currently only supports creating models. If your model changes, it's up to 
 migration to support that.
 
 Migrator API
-=======================
+============
 
-The previous exmple shows the files that were created automatically to support two models. The
-argument to upgrade() and downgrade() is a migrator instance that has a database-agnostic API.
-This allows you to write command in Python that will get executed against the database when you
-call upgrade or downgrade.
+The previous exmple shows the files that were created automatically to support two models.
+The argument to upgrade() and downgrade() is a migrator instance that has a database-agnostic API.
+This allows you to write command in Python that will get executed against the database when
+upgrade() and downgrade() are called.
 
 Here's a full example of everything you can do in either upgrade() or downgrade() using the migrator
 API:
@@ -210,7 +202,7 @@ API:
         table.text('colname', **kwargs)
         table.time('colname', **kwargs)
         table.uuid('colname', **kwargs)
-        table.foreign_key('colname', references='othertable.col')
+        table.foreign_key('coltype', 'colname', references='othertable.col')
         table.add_index(('col1', 'col2'), unique=True)
         table.add_constraint('constraint string')
 
@@ -225,8 +217,8 @@ API:
     migrator.drop_index('table', 'index_name')
     cursor = migrator.execute_sql(sql, params=None)
 
-The kwargs are passed to the field as they would be if you were defining
-the field on the model itself.
+The kwargs are passed to the field as they would be if you were defining the
+field on a Peewee model class.
 
 The migrator.execute_sql allows for writing direct SQL if you need to. There's nothing stopping
 you from writing something specific to your database engine using this method.
@@ -234,15 +226,81 @@ you from writing something specific to your database engine using this method.
 And remember, the migration files are just Python! So you can import and run other Python code
 if needed.
 
+Command Line Usage
+==================
+
+A command named ``peewee-db`` is automatically installed with this package.
+This command allows you to easily issue database management commands without using the Python
+API directly:
+
+.. code:: console
+
+    $ peewee-db --help
+
+    Usage: peewee-db [OPTIONS] COMMAND [ARGS]...
+
+        Run database migration commands.
+
+    Options:
+        --directory TEXT  [required]
+        --database TEXT   [required]
+        --table TEXT
+        --help            Show this message and exit.
+
+    Commands:
+        create     Create a migration based on an existing...
+        delete     Delete the target migration from the...
+        downgrade  Run database downgrades.
+        info       Show information about the current database.
+        revision   Create a blank migration file.
+        status     Show information about migration status.
+        upgrade    Run database upgrades.
+
+Each command requires that you specify a ``database`` and ``directory`` where
+``database`` is the URL to your database and ``directory`` is where migration files are stored.
+
+For example, here's how you can show the status of your database:
+
+.. code:: console
+
+    $ peewee-db --database=mydata.sqlite --directory=migrations status
+    INFO: [ ] 0001_create_table_auth_groups
+    INFO: [ ] 0002_create_table_auth_users
+
+And to create a new revision file you can do this:
+
+.. code:: console
+
+    $ peewee-db --database=mydata.sqlite --directory=migrations revision "custom revision"
+    INFO: created: 0003_custom_revision
+
 Flask Usage
 ===========
 
 This package includes an interface to Flask versions 0.11 or later using Click which provides an
 easy-to-use command line interface.
-
 If you are using Flask 0.10, you can use backported integration via Flask-CLI.
 
-Flask-Moves will automatically add the command to the cli if it detects that Click is available.
+For this to work properly, you must define a configuration variable named ``DATABASE`` in your
+Flask app config:
+
+.. code:: python
+
+    app = Flask(__name__)
+    app.config['DATABASE'] = 'sqlite:///database.sqlite'
+
+This can be a connection string as shown above, or also a dict or ``peewee.Database`` instance.
+
+.. code:: python
+
+    app.config['DATABASE'] = SqliteDatabase('test.sqlite')
+
+    app.config['DATABASE'] = {
+        'engine': 'peewee.SqliteDatabase',
+        'name': 'test.sqlite'
+    }
+
+The ``db`` command will automatically add the command to the cli if Flask is installed:
 
 .. code:: console
 
@@ -255,19 +313,19 @@ This gives you the following command line interface:
     $ flask db --help
     Usage: flask db [OPTIONS] COMMAND [ARGS]...
 
-      Run Peewee migration commands.
+        Run database migration commands for a Flask application.
 
     Options:
-      --help  Show this message and exit.
+        --help  Show this message and exit.
 
     Commands:
-      create     Create a migration based on an existing...
-      delete     Delete the target migration from the...
-      downgrade  Run database downgrades.
-      info       Show information about the current database.
-      revision   Create a blank migration file.
-      status     Show information about the database.
-      upgrade    Run database upgrades.
+        create     Create a migration based on an existing model.
+        delete     Delete the target migration from the filesystem and database.
+        downgrade  Run database downgrades.
+        info       Show information about the current database.
+        revision   Create a blank migration file.
+        status     Show information about the database.
+        upgrade    Run database upgrades.
 
 This should look very similar since it uses the same commands we just looked at!
 
@@ -276,11 +334,11 @@ For example, to create the migration for User model would look like this:
 .. code:: console
 
     $ flask db create models.User
-    INFO: 0003_create_table_user: created
+    INFO: created: 0003_create_table_user
 
 And to create a blank migration with a custom name would look like this:
 
 .. code:: console
 
     $ flask db revision "custom revision"
-    INFO: 0004_custom_revision: created
+    INFO: created: 0004_custom_revision

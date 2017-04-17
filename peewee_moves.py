@@ -364,8 +364,10 @@ class Migrator:
     """
     A migrator is a class that runs migrations for a specific upgrade or downgrade operation.
 
+    An instance of this class is automatically created and passed as the only argument to
+    ``upgrade(migrator)`` and ``downgrade(migrator)`` methods in migration files.
+
     :param database: Connection string, dict, or peewee.Database instance to use.
-    :return:
     """
 
     def __init__(self, database):
@@ -839,9 +841,9 @@ class DatabaseManager:
 
     def revision(self, name=None):
         """
-        Create a single blank migration file with given name or default of 'automigration'.
+        Create a single blank migration file with given name or default of 'auto migration'.
 
-        :param name: Name of migration to create (default automigration).
+        :param name: Name of migration to create (default auto migration).
         :return: True if migration file was created, otherwise False.
         :type: bool
         """
