@@ -27,7 +27,7 @@ Requirements
 ============
 
 * python >= 3.3
-* peewee >= 2.8.0
+* peewee >= 2.8.2
 
 Installation
 ============
