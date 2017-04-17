@@ -1,3 +1,4 @@
+import sys
 import inspect
 import logging
 import os
@@ -9,13 +10,17 @@ import peewee
 from playhouse.db_url import connect as url_connect
 from playhouse.migrate import SchemaMigrator
 
+__version__ = '1.6.3'
+
+__all__ = []
+
 try:
     import click
     from flask import cli
     from flask import current_app
-    EXTENSION_CLICK = True
+    FLASK_CLI_ENABLED = True
 except ImportError:
-    EXTENSION_CLICK = False
+    FLASK_CLI_ENABLED = False
 
 LOG_HANDLER = logging.StreamHandler()
 LOG_HANDLER.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
@@ -27,7 +32,6 @@ LOGGER.addHandler(LOG_HANDLER)
 PEEWEE_TO_FIELD = {
     peewee.BareField: 'bare',
     peewee.BigIntegerField: 'biginteger',
-    peewee.BlobField: 'binary',
     peewee.BlobField: 'blob',
     peewee.BooleanField: 'bool',
     peewee.CharField: 'char',
@@ -50,6 +54,7 @@ PEEWEE_TO_FIELD = {
 FIELD_TO_PEEWEE = {value: key for key, value in PEEWEE_TO_FIELD.items()}
 FIELD_TO_PEEWEE['integer'] = peewee.IntegerField
 FIELD_TO_PEEWEE['smallinteger'] = peewee.SmallIntegerField
+FIELD_TO_PEEWEE['binary'] = peewee.BlobField
 
 FIELD_KWARGS = ('null', 'index', 'unique', 'sequence', 'max_length', 'max_digits', 'decimal_places')
 
@@ -63,7 +68,7 @@ TEMPLATE = ''.join((
 def build_downgrade_from_model(model):
     """
     Build a list of 'downgrade' operations for a model class.
-    Each value that is yieled is one operation.
+    Each value that is yieled is one line to write to a file.
 
     :param model: Peewee model class or instance.
     :return: generator
@@ -75,7 +80,7 @@ def build_downgrade_from_model(model):
 def build_upgrade_from_model(model):
     """
     Build a list of 'upgrade' operations for a model class.
-    Each value that is yieled is one operation.
+    Each value that is yieled is one line to write to a file.
 
     :param model: Peewee model class or instance.
     :return: generator
@@ -85,43 +90,52 @@ def build_upgrade_from_model(model):
 
     for field in model._meta.sorted_fields:
         field_type = PEEWEE_TO_FIELD.get(field.__class__, 'char')
+        args = []
 
         # Add all fields. Foreign Key is a special case.
         if field_type == 'foreign_key':
             other_table = field.rel_model._meta.db_table
             other_col = field.to_field.db_column
-            kwargs = {'references': '{}.{}'.format(other_table, other_col)}
-            if field.on_delete:
-                kwargs['on_delete'] = field.on_delete
-            if field.on_update:
-                kwargs['on_update'] = field.on_update
+            kwargs = {
+                'references': '{}.{}'.format(other_table, other_col),
+                'on_delete': field.on_delete,
+                'on_update': field.on_update,
+            }
+            coltype = 'int' if field.to_field.db_field == 'primary_key' else field.to_field.db_field
+            args.append(coltype)
+
         else:
             kwargs = {
                 key: getattr(field, key) for key in FIELD_KWARGS if getattr(field, key, None)
             }
 
-            # Check for constraints which is a special case
-            field_constraints = getattr(field, 'constraints', ())
-            if field_constraints:
-                constraints = []
-                for const in field_constraints:
-                    value = const
-                    if isinstance(const, peewee.SQL):
-                        value = const.value
-                    constraints.append(value)
-                kwargs['constraints'] = constraints
+        # Check for constraints which is a special case
+        field_constraints = getattr(field, 'constraints', ())
+        if field_constraints:
+            constraints = []
+            for const in field_constraints:
+                value = const
+                if isinstance(const, peewee.SQL):
+                    value = const.value
+                constraints.append(value)
+            kwargs['constraints'] = constraints
+
+        # Flatten the arg list for the field.
+        argstr = ', '.join("'{}'".format(x) for x in map(str, args))
+        if argstr:
+            argstr = '{}, '.format(argstr)
 
         # Flatten the keyword arguments for the field.
-        args_list = ["'{}'".format(field.db_column)]
+        kwarg_list = ["'{}'".format(field.db_column)]
         for key, value in sorted(kwargs.items()):
             if isinstance(value, str):
                 value = "'{}'".format(value)
-            args_list.append('{}={}'.format(key, value))
+            kwarg_list.append('{}={}'.format(key, value))
 
         # Then yield the field!
-        yield "    table.{}({})".format(field_type, str.join(', ', args_list))
+        yield "    table.{}({}{})".format(field_type, argstr, str.join(', ', kwarg_list))
 
-    # Loop through all constraints and yield them!
+    # Loop through all table constraints and yield them!
     constraints = getattr(model._meta, 'constraints', [])
     if constraints:
         for const in constraints:
@@ -130,7 +144,7 @@ def build_upgrade_from_model(model):
                 value = const.value
             yield "    table.add_constraint('{}')".format(value)
 
-    # Loop through all indexes and yield them!
+    # Loop through all table indexes and yield them!
     indexes = getattr(model._meta, 'indexes', [])
     if indexes:
         for columns, unique in indexes:
@@ -142,7 +156,11 @@ def build_upgrade_from_model(model):
 
 
 class MigrationHistory(peewee.Model):
-    """Base model to manage migration history in a database."""
+    """
+    Base model to manage migration history in a database.
+    You can use this manually to query the database if you want, but normally it's handled
+    by the DatabaseManager class.
+    """
     name = peewee.CharField(unique=True)
     date_applied = peewee.DateTimeField(default=datetime.utcnow)
 
@@ -152,70 +170,90 @@ class MigrationHistory(peewee.Model):
 
 
 class TableCreator:
-    def __init__(self, name):
-        """
-        Initialize a new TableCreator instance.
+    """
+    A class used for creating a table in a migration file.
 
-        :param name: Name of database table.
-        """
+    :param name: Name of database table.
+    """
+
+    def __init__(self, name):
         self.name = name
         self.model = self.build_fake_model(self.name)
 
     def bare(self, name, **kwargs):
+        """Create a bare column. Alias for ``table.column('bare')``"""
         return self.column('bare', name, **kwargs)
 
     def biginteger(self, name, **kwargs):
+        """Create a biginteger column. Alias for ``table.column('biginteger')``"""
         return self.column('biginteger', name, **kwargs)
 
     def binary(self, name, **kwargs):
+        """Create a binary column. Alias for ``table.column('binary')``"""
         return self.column('binary', name, **kwargs)
 
     def blob(self, name, **kwargs):
+        """Create a blob column. Alias for ``table.column('blob')``"""
         return self.column('blob', name, **kwargs)
 
     def bool(self, name, **kwargs):
+        """Create a bool column. Alias for ``table.column('bool')``"""
         return self.column('bool', name, **kwargs)
 
     def char(self, name, **kwargs):
+        """Create a char column. Alias for ``table.column('char')``"""
         return self.column('char', name, **kwargs)
 
     def date(self, name, **kwargs):
+        """Create a date column. Alias for ``table.column('date')``"""
         return self.column('date', name, **kwargs)
 
     def datetime(self, name, **kwargs):
+        """Create a datetime column. Alias for ``table.column('datetime')``"""
         return self.column('datetime', name, **kwargs)
 
     def decimal(self, name, **kwargs):
+        """Create a decimal column. Alias for ``table.column('decimal')``"""
         return self.column('decimal', name, **kwargs)
 
     def double(self, name, **kwargs):
+        """Create a double column. Alias for ``table.column('double')``"""
         return self.column('double', name, **kwargs)
 
     def fixed(self, name, **kwargs):
+        """Create a fixed column. Alias for ``table.column('fixed')``"""
         return self.column('fixed', name, **kwargs)
 
     def float(self, name, **kwargs):
+        """Create a float column. Alias for ``table.column('float')``"""
         return self.column('float', name, **kwargs)
 
     def int(self, name, **kwargs):
+        """Create a int column. Alias for ``table.column('int')``"""
         return self.column('int', name, **kwargs)
 
     def integer(self, name, **kwargs):
+        """Create a integer column. Alias for ``table.column('integer')``"""
         return self.column('int', name, **kwargs)
 
     def smallint(self, name, **kwargs):
+        """Create a smallint column. Alias for ``table.column('smallint')``"""
         return self.column('smallint', name, **kwargs)
 
     def smallinteger(self, name, **kwargs):
+        """Create a smallinteger column. Alias for ``table.column('smallinteger')``"""
         return self.column('smallinteger', name, **kwargs)
 
     def text(self, name, **kwargs):
+        """Create a text column. Alias for ``table.column('text')``"""
         return self.column('text', name, **kwargs)
 
     def time(self, name, **kwargs):
+        """Create a time column. Alias for ``table.column('time')``"""
         return self.column('time', name, **kwargs)
 
     def uuid(self, name, **kwargs):
+        """Create a uuid column. Alias for ``table.column('uuid')``"""
         return self.column('uuid', name, **kwargs)
 
     def build_fake_model(self, name):
@@ -268,7 +306,7 @@ class TableCreator:
         self.model._meta.auto_increment = True
         pk_field.add_to_class(self.model, name)
 
-    def foreign_key(self, name, references, **kwargs):
+    def foreign_key(self, coltype, name, references, **kwargs):
         """
         Add a foreign key to the model.
         This has some special cases, which is why it's not handled like all the other column types.
@@ -285,16 +323,19 @@ class TableCreator:
         except ValueError:
             rel_table, rel_column = references, 'id'
 
+        # Create a dummy model that we can relate this field to.
+        # Add the foreign key as a local field on the dummy model.
+        # We only do this so that Peewee can generate the nice foreign key constraint for us.
+
         class DummyRelated(peewee.Model):
             class Meta:
+                primary_key = False
                 database = peewee.Proxy()
                 db_table = rel_table
 
-        # If the to_field is not "id" then add it to the DummyRelated class.
-        if rel_column != 'id':
-            # TODO: might not be related to an integer field :/
-            rel_field = peewee.IntegerField()
-            rel_field.add_to_class(DummyRelated, rel_column)
+        rel_field_class = FIELD_TO_PEEWEE.get(coltype, peewee.IntegerField)
+        rel_field = rel_field_class()
+        rel_field.add_to_class(DummyRelated, rel_column)
 
         field = peewee.ForeignKeyField(DummyRelated, db_column=name, to_field=rel_column, **kwargs)
         field.add_to_class(self.model, name)
@@ -319,13 +360,14 @@ class TableCreator:
 
 
 class Migrator:
-    def __init__(self, database):
-        """
-        Initialize a new Migrator instance for the given database.
+    """
+    A migrator is a class that runs migrations for a specific upgrade or downgrade operation.
 
-        :param database: Connection string, dict, or peewee.Database instance to use.
-        :return:
-        """
+    :param database: Connection string, dict, or peewee.Database instance to use.
+    :return:
+    """
+
+    def __init__(self, database):
         self.database = database
         self.migrator = SchemaMigrator.from_database(self.database)
         self.models = []
@@ -350,7 +392,7 @@ class Migrator:
 
     def drop_table(self, name, safe=False, cascade=False):
         """
-        Drop the table.
+        Drop the given table.
 
         :param name: Table name to drop.
         :param safe: If True, exception will be raised if table does not exist.
@@ -460,29 +502,37 @@ class Migrator:
 
 
 class DatabaseManager:
+    """
+    A DatabaseManager is a class responsible for managing and running all migrations
+    against a specific database with a set of migration files.
+
+    :param database: Connection string, dict, or peewee.Database instance to use.
+    :param table_name: Table name to hold migrations (default migration_history).
+    :param directory: Directory to store migrations (default migrations).
+    """
+
     ext = '.py'
 
-    def __init__(self, database, table_name='migration_history', directory='migrations'):
-        """
-        Initialize a DatabaseManager with the given options.
-
-        :param database: Connection string, dict, or peewee.Database instance to use.
-        :param table_name: Table name to hold migrations (default migration_history).
-        :param directory: Directory to store migrations (default migrations).
-        """
+    def __init__(self, database, table_name=None, directory='migrations'):
         self.directory = str(directory)
         self.database = self.load_database(database)
         self.migrator = Migrator(self.database)
 
         os.makedirs(self.directory, exist_ok=True)
 
-        MigrationHistory._meta.db_table = table_name
+        MigrationHistory._meta.db_table = table_name or 'migration_history'
         MigrationHistory._meta.database.initialize(self.database)
         MigrationHistory.create_table(fail_silently=True)
 
     def load_database(self, database):
         """
         Load the given database, whatever it might be.
+
+        A connection string: ``sqlite:///database.sqlite``
+
+        A dictionary: ``{'engine': 'SqliteDatabase', 'name': 'database.sqlite'}``
+
+        A peewee.Database instance: ``peewee.SqliteDatabase('database.sqlite')``
 
         :param database: Connection string, dict, or peewee.Database instance to use.
         :raises: peewee.DatabaseError if database connection cannot be established.
@@ -516,10 +566,10 @@ class DatabaseManager:
         List all the migrations sitting on the filesystem.
 
         :return: List of migration names.
-        :rtype: list
+        :rtype: tuple
         """
         files = (f[:-len(self.ext)] for f in os.listdir(self.directory) if f.endswith(self.ext))
-        return sorted(files)
+        return tuple(sorted(files))
 
     @property
     def db_migrations(self):
@@ -527,9 +577,9 @@ class DatabaseManager:
         List all the migrations applied to the database.
 
         :return: List of migration names.
-        :rtype: list
+        :rtype: tuple
         """
-        return sorted(row.name for row in MigrationHistory.select())
+        return tuple(sorted(row.name for row in MigrationHistory.select()))
 
     @property
     def diff(self):
@@ -537,9 +587,9 @@ class DatabaseManager:
         List all the migrations that have not been applied to the database.
 
         :return: List of migration names.
-        :rtype: list
+        :rtype: tuple
         """
-        return sorted(set(self.migration_files) - set(self.db_migrations))
+        return tuple(sorted(set(self.migration_files) - set(self.db_migrations)))
 
     def find_migration(self, value):
         """
@@ -557,12 +607,15 @@ class DatabaseManager:
 
     def get_ident(self):
         """
-        Return a unique identifier for a revision. Override this method to change functionality.
+        Return a unique identifier for a revision.
+        This defaults to the current next incremental identifier.
+        Override this method to change functionality.
         Make sure the IDs will be sortable (like timestamps or incremental numbers).
 
         :return: Name of new migration.
         :rtype: str
         """
+        # return str(round(time.time()))
         next_id = 1
         if self.migration_files:
             next_id = int(list(self.migration_files)[-1].split('_')[0]) + 1
@@ -848,60 +901,96 @@ class DatabaseManager:
         return True
 
 
-if EXTENSION_CLICK:
+@click.group()
+@click.option('--directory', required=True)
+@click.option('--database', required=True)
+@click.option('--table')
+@click.pass_context
+def cli_command(ctx, directory, database, table=None):
+    """Run database migration commands."""
+    class ScriptInfo:
+        def __init__(self):
+            self.data = {'manager': None}
 
-    def get_database_manager(app):
-        """Return a DatabaseManager for the given Flask application."""
-        directory = os.path.join(app.root_path, 'migrations')
-        return DatabaseManager(app.config['DATABASE'], directory=directory)
+    ctx.obj = ctx.obj or ScriptInfo()
+    ctx.obj.data['manager'] = DatabaseManager(database, table_name=table, directory=directory)
+
+
+@cli_command.command('info')
+@click.pass_context
+def cli_info(ctx):
+    """Show information about the current database."""
+    ctx.obj.data['manager'].info()
+
+
+@cli_command.command('status')
+@click.pass_context
+def cli_status(ctx):
+    """Show information about migration status."""
+    ctx.obj.data['manager'].status()
+
+
+@cli_command.command('create')
+@click.argument('model')
+@click.pass_context
+def cli_create(ctx, model):
+    """Create a migration based on an existing model."""
+    if not ctx.obj.data['manager'].create(model):
+        sys.exit(1)
+
+
+@cli_command.command('revision')
+@click.argument('name')
+@click.pass_context
+def cli_revision(ctx, name):
+    """Create a blank migration file."""
+    if not ctx.obj.data['manager'].revision(name):
+        sys.exit(1)
+
+
+@cli_command.command('upgrade')
+@click.argument('target', default='')
+@click.pass_context
+def cli_upgrade(ctx, target):
+    """Run database upgrades."""
+    if not ctx.obj.data['manager'].upgrade(target):
+        sys.exit(1)
+
+
+@cli_command.command('downgrade')
+@click.argument('target', default='')
+@click.pass_context
+def cli_downgrade(ctx, target):
+    """Run database downgrades."""
+    if not ctx.obj.data['manager'].downgrade(target):
+        sys.exit(1)
+
+
+@cli_command.command('delete')
+@click.argument('target', default='')
+@click.pass_context
+def cli_delete(ctx, target):
+    """Delete the target migration from the filesystem and database."""
+    if not ctx.obj.data['manager'].delete(target):
+        sys.exit(1)
+
+
+if FLASK_CLI_ENABLED:
 
     @click.group()
-    def command():
-        """Run Peewee migration commands."""
-
-    @command.command()
-    @click.argument('model')
+    @click.option('--table')
+    @click.pass_context
     @cli.with_appcontext
-    def create(model):
-        """Create a migration based on an existing model."""
-        get_database_manager(current_app).create(model)
+    def flask_command(ctx, table=None):
+        """Run database migration commands for a Flask application."""
+        directory = os.path.join(current_app.root_path, 'migrations')
+        database = current_app.config['DATABASE']
+        ctx.obj.data['manager'] = DatabaseManager(database, table_name=table, directory=directory)
 
-    @command.command()
-    @cli.with_appcontext
-    def info():
-        """Show information about the current database."""
-        get_database_manager(current_app).info()
-
-    @command.command()
-    @cli.with_appcontext
-    def status():
-        """Show information about the database."""
-        get_database_manager(current_app).status()
-
-    @command.command()
-    @click.argument('name')
-    @cli.with_appcontext
-    def revision(name):
-        """Create a blank migration file."""
-        get_database_manager(current_app).revision(name)
-
-    @command.command()
-    @click.argument('target', default='')
-    @cli.with_appcontext
-    def upgrade(target):
-        """Run database upgrades."""
-        get_database_manager(current_app).upgrade(target)
-
-    @command.command()
-    @click.argument('target', default='')
-    @cli.with_appcontext
-    def downgrade(target):
-        """Run database downgrades."""
-        get_database_manager(current_app).downgrade(target)
-
-    @command.command()
-    @click.argument('target', default='')
-    @cli.with_appcontext
-    def delete(target):
-        """Delete the target migration from the filesystem and database."""
-        get_database_manager(current_app).delete(target)
+    flask_command.add_command(cli_info)
+    flask_command.add_command(cli_status)
+    flask_command.add_command(cli_create)
+    flask_command.add_command(cli_revision)
+    flask_command.add_command(cli_upgrade)
+    flask_command.add_command(cli_downgrade)
+    flask_command.add_command(cli_delete)

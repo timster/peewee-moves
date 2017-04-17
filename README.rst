@@ -1,4 +1,4 @@
-Peewee Moves
+peewee-moves
 ############
 
 A simple and flexible migration manager for `Peewee ORM <http://docs.peewee-orm.com/>`_.
@@ -61,7 +61,7 @@ Here's a quick teaser of what you can do with peewee-moves:
     INFO: 0002_do_something: pending
 
 And if you're curious, here's what `0001_create_table_category.py` looks like. A migration was
-automatically created based on the definition of the Category model!
+automatically created based on the definition of the Category model.
 
 .. code:: python
 
@@ -74,18 +74,7 @@ automatically created based on the definition of the Category model!
     def downgrade(migrator):
         migrator.drop_table('category')
 
-Check out the `Usage documentation <USAGE.rst>`_ for more details.
+Documentation
+=============
 
-Todo
-====
-
-* Command line usage without Flask
-* More documentation
-* More examples
-* More tests
-
-Feedback
-========
-
-This package is very immature. If you have any comments, suggestions, feedback, or issues, please
-feel free to send me a message or submit an issue on Github.
+Check out the `Full Documentation <http://peewee-moves.readthedocs.io>`_ for more details.

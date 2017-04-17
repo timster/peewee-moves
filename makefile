@@ -38,3 +38,6 @@ testcov:
 	py.test --cov=peewee_moves.py
 	coverage html --directory=.covhtml
 	open .covhtml/index.html
+
+docs:
+	sphinx-build -b html docs/ docs/_build/html

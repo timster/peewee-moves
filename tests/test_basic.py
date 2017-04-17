@@ -43,17 +43,19 @@ def test_info(tmpdir, caplog):
 def test_revision(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
-    manager.revision()
-    assert 'created: 0001_auto_migration' in caplog.text
+    assert manager.revision()
+    first = manager.migration_files[0]
+    assert 'created: {}'.format(first) in caplog.text
 
-    manager.revision('Custom Name')
-    assert 'created: 0002_custom_name' in caplog.text
+    assert manager.revision('Custom Name')
+    first = manager.migration_files[1]
+    assert 'created: {}'.format(first) in caplog.text
 
 
 def test_revision_error(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
 
-    manager.revision('Bad Characters: \0')
+    assert not manager.revision('Bad Characters: \0')
     assert 'embedded' in caplog.text
 
 
@@ -61,11 +63,15 @@ def test_find_migration(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
 
-    rv = manager.find_migration('0001')
-    assert rv == '0001_auto_migration'
+    # find the first migration name
+    first = manager.migration_files[0]
+    first_id = first.split('_')[0]
 
-    rv = manager.find_migration('0001_auto_migration')
-    assert rv == '0001_auto_migration'
+    rv = manager.find_migration(first_id)
+    assert rv == first
+
+    rv = manager.find_migration(first)
+    assert rv == first
 
     with pytest.raises(ValueError):
         manager.find_migration('does_not_exist')
@@ -74,8 +80,9 @@ def test_find_migration(tmpdir):
 def test_open_migration(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
+    first = manager.migration_files[0]
 
-    with manager.open_migration('0001_auto_migration') as handle:
+    with manager.open_migration(first) as handle:
         content = handle.read()
 
     assert content.startswith('"""\nauto migration')
@@ -90,38 +97,41 @@ def test_status(tmpdir, caplog):
     assert 'no migrations found' in caplog.text
 
     manager.revision()
-    assert 'created: 0001_auto_migration' in caplog.text
+    first = manager.migration_files[0]
+    assert 'created: {}'.format(first) in caplog.text
 
     manager.status()
-    assert '[ ] 0001_auto_migration' in caplog.text
+    assert '[ ] {}'.format(first) in caplog.text
 
 
 def test_files_and_diff(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
     manager.revision('custom name')
+    migrations = manager.migration_files
 
     rv = manager.db_migrations
-    assert rv == []
+    assert not rv
 
     rv = manager.migration_files
-    assert rv == ['0001_auto_migration', '0002_custom_name']
+    assert rv == (migrations[0], migrations[1],)
 
     rv = manager.diff
-    assert rv == ['0001_auto_migration', '0002_custom_name']
+    assert rv == (migrations[0], migrations[1],)
 
 
 def test_upgrade_all(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
     manager.revision()
+    migrations = manager.migration_files
 
     manager.upgrade()
-    assert 'upgrade: 0001_auto_migration' in caplog.text
-    assert 'upgrade: 0002_auto_migration' in caplog.text
+    assert 'upgrade: {}'.format(migrations[0]) in caplog.text
+    assert 'upgrade: {}'.format(migrations[1]) in caplog.text
 
-    assert manager.db_migrations == ['0001_auto_migration', '0002_auto_migration']
-    assert manager.diff == []
+    assert manager.db_migrations == (migrations[0], migrations[1])
+    assert not manager.diff
 
     # All migrations applied now...
     manager.upgrade()
@@ -132,31 +142,33 @@ def test_upgrade_target(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
     manager.revision()
+    migrations = manager.migration_files
 
-    manager.upgrade('0001')
-    assert 'upgrade: 0001_auto_migration' in caplog.text
+    manager.upgrade(migrations[0])
+    assert 'upgrade: {}'.format(migrations[0]) in caplog.text
 
-    assert manager.db_migrations == ['0001_auto_migration']
-    assert manager.diff == ['0002_auto_migration']
+    assert manager.db_migrations == (migrations[0],)
+    assert manager.diff == (migrations[1],)
 
 
 def test_already_upgraded(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
+    migrations = manager.migration_files
 
-    manager.upgrade('0001')
-    assert 'upgrade: 0001_auto_migration' in caplog.text
+    manager.upgrade(migrations[0])
+    assert 'upgrade: {}'.format(migrations[0]) in caplog.text
 
-    manager.upgrade('0001')
-    assert 'already applied: 0001_auto_migration' in caplog.text
+    manager.upgrade(migrations[0])
+    assert 'already applied: {}'.format(migrations[0]) in caplog.text
 
 
 def test_upgrade_target_error(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
 
-    manager.upgrade('9999')
-    assert 'could not find migration: 9999' in caplog.text
+    manager.upgrade('does-not-exist')
+    assert 'could not find migration: does-not-exist' in caplog.text
 
 
 def test_downgrade_nodiff(tmpdir, caplog):
@@ -170,15 +182,16 @@ def test_downgrade_single(tmpdir, caplog):
     manager.revision()
     manager.revision()
     manager.upgrade()
+    migrations = manager.migration_files
 
-    assert manager.db_migrations == ['0001_auto_migration', '0002_auto_migration']
-    assert manager.diff == []
+    assert manager.db_migrations == (migrations[0], migrations[1],)
+    assert not manager.diff
 
     manager.downgrade()
-    assert 'downgrade: 0002_auto_migration' in caplog.text
+    assert 'downgrade: {}'.format(migrations[1]) in caplog.text
 
-    assert manager.db_migrations == ['0001_auto_migration']
-    assert manager.diff == ['0002_auto_migration']
+    assert manager.db_migrations == (migrations[0],)
+    assert manager.diff == (migrations[1],)
 
 
 def test_downgrade_target(tmpdir, caplog):
@@ -186,40 +199,42 @@ def test_downgrade_target(tmpdir, caplog):
     manager.revision()
     manager.revision()
     manager.upgrade()
+    migrations = manager.migration_files
 
-    assert manager.db_migrations == ['0001_auto_migration', '0002_auto_migration']
-    assert manager.diff == []
+    assert manager.db_migrations == (migrations[0], migrations[1],)
+    assert not manager.diff
 
     manager.downgrade('0001')
-    assert 'downgrade: 0002_auto_migration' in caplog.text
-    assert 'downgrade: 0001_auto_migration' in caplog.text
+    assert 'downgrade: {}'.format(migrations[1]) in caplog.text
+    assert 'downgrade: {}'.format(migrations[0]) in caplog.text
 
-    assert manager.db_migrations == []
-    assert manager.diff == ['0001_auto_migration', '0002_auto_migration']
+    assert not manager.db_migrations
+    assert manager.diff == (migrations[0], migrations[1],)
 
 
 def test_downgrade_not_applied(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
+    migrations = manager.migration_files
 
-    manager.downgrade('0001')
-    assert 'not yet applied: 0001_auto_migration' in caplog.text
+    manager.downgrade(migrations[0])
+    assert 'not yet applied: {}'.format(migrations[0]) in caplog.text
 
 
 def test_downgrade_target_error(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
 
-    manager.downgrade('9999')
-    assert 'could not find migration: 9999' in caplog.text
+    manager.downgrade('does-not-exist')
+    assert 'could not find migration: does-not-exist' in caplog.text
 
 
 def test_run_migration_not_found(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
 
-    manager.run_migration('9999')
-    assert 'could not find migration: 9999' in caplog.text
+    manager.run_migration('does-not-exist')
+    assert 'could not find migration: does-not-exist' in caplog.text
 
 
 def test_run_migration_exception(tmpdir, caplog):
@@ -239,12 +254,13 @@ def test_delete(tmpdir, caplog):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
     manager.revision()
     manager.upgrade()
+    migrations = manager.migration_files
 
-    manager.delete('0001')
-    assert 'deleted: 0001_auto_migration' in caplog.text
+    manager.delete(migrations[0])
+    assert 'deleted: {}'.format(migrations[0]) in caplog.text
 
-    assert manager.db_migrations == []
-    assert manager.migration_files == []
+    assert not manager.db_migrations
+    assert not manager.migration_files
 
 
 def test_delete_not_found(tmpdir, caplog):
@@ -252,5 +268,5 @@ def test_delete_not_found(tmpdir, caplog):
     manager.revision()
     manager.upgrade()
 
-    manager.delete('9999')
-    assert 'could not find migration: 9999' in caplog.text
+    manager.delete('does-not-exist')
+    assert 'could not find migration: does-not-exist' in caplog.text

@@ -2,6 +2,8 @@ from setuptools import setup
 from codecs import open
 from os import path
 
+from peewee_moves import __version__
+
 root_dir = path.abspath(path.dirname(__file__))
 
 with open(path.join(root_dir, 'README.rst'), encoding='utf-8') as f:
@@ -13,7 +15,7 @@ with open(path.join(root_dir, 'requirements.txt'), encoding='utf-8') as f:
 
 setup(
     name='peewee-moves',
-    version='1.6.3',
+    version=__version__,
 
     description='Simple and flexible migration manager for Peewee ORM.',
     long_description=long_description,
@@ -44,7 +46,10 @@ setup(
 
     entry_points={
         'flask.commands': [
-            'db = peewee_moves:command',
+            'db = peewee_moves:flask_command',
+        ],
+        'console_scripts': [
+            'peewee-db = peewee_moves:cli_command'
         ],
     },
 

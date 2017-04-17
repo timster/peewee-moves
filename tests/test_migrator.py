@@ -123,20 +123,20 @@ def test_foreign_key(tmpdir):
 
     with manager.migrator.create_table('related1') as table:
         table.primary_key('id')
-        table.foreign_key('basic_id', 'basic')
+        table.foreign_key('int', 'basic_id', 'basic')
 
     with manager.migrator.create_table('related2') as table:
         table.primary_key('id')
-        table.foreign_key('basic_id', 'basic.id')
+        table.foreign_key('int', 'basic_id', 'basic.id')
 
     with manager.migrator.create_table('related3') as table:
         table.primary_key('id')
-        table.foreign_key('basic', 'basic')
+        table.foreign_key('int', 'basic', 'basic')
 
     with manager.migrator.create_table('related4') as table:
         table.primary_key('id')
-        table.foreign_key('basic', 'basic.id')
+        table.foreign_key('int', 'basic', 'basic.id')
 
     with manager.migrator.create_table('related5') as table:
         table.primary_key('id')
-        table.foreign_key('basic', 'basic.username')
+        table.foreign_key('char', 'basic', 'basic.username')
