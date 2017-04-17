@@ -12,7 +12,8 @@ from playhouse.migrate import SchemaMigrator
 
 __version__ = '1.6.3'
 
-__all__ = []
+__all__ = ['DatabaseManager', 'MigrationHistory', 'Migrator', 'SchemaMigrator', 'TableCreator']
+
 
 try:
     import click
