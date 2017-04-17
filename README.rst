@@ -19,6 +19,10 @@ A simple and flexible migration manager for `Peewee ORM <http://docs.peewee-orm.
     :target: https://pypi.python.org/pypi/peewee-moves
     :alt: Downloads
 
+.. image:: https://readthedocs.org/projects/peewee-moves/badge/?version=latest
+    :target: https://peewee-moves.readthedocs.io
+    :alt: Documentation
+
 Requirements
 ============
 
