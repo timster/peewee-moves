@@ -543,7 +543,7 @@ class DatabaseManager:
         :rtype: peewee.Database instance.
         """
         # It could be an actual instance...
-        if isinstance(database, peewee.Database):
+        if isinstance(database, (peewee.Proxy, peewee.Database)):
             return database
 
         # It could be a dictionary...
