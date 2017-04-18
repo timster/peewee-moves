@@ -980,15 +980,19 @@ def cli_delete(ctx, target):
 
 if FLASK_CLI_ENABLED:
 
+    def get_flask_database_manager(app, table=None):
+        """Get a database manager for the given Flask application."""
+        directory = os.path.join(app.root_path, 'migrations')
+        database = app.config['DATABASE']
+        return DatabaseManager(database, table_name=table, directory=directory)
+
     @click.group()
     @click.option('--table')
     @click.pass_context
     @cli.with_appcontext
     def flask_command(ctx, table=None):
         """Run database migration commands for a Flask application."""
-        directory = os.path.join(current_app.root_path, 'migrations')
-        database = current_app.config['DATABASE']
-        ctx.obj.data['manager'] = DatabaseManager(database, table_name=table, directory=directory)
+        ctx.obj.data['manager'] = get_flask_database_manager(current_app, table=None)
 
     flask_command.add_command(cli_info)
     flask_command.add_command(cli_status)
