@@ -29,6 +29,11 @@ Requirements
 * python >= 3.3
 * peewee >= 2.8.2
 
+Warning
+-------
+
+This package does not yet work with peewee 3. I'm working on it. Feel free to help out with pull requests if you want.
+
 Installation
 ============
 
