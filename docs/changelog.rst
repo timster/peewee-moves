@@ -1,6 +1,10 @@
 Changelog
 #########
 
+1.7.3
+=====
+- Added missing click dependency.
+
 1.7.2
 =====
 - Fixed issue passing a ``peewee.Proxy`` to ``DatabaseManager``.
