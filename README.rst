@@ -26,8 +26,8 @@ A simple and flexible migration manager for `Peewee ORM <http://docs.peewee-orm.
 Requirements
 ============
 
-* python >= 3.3
-* peewee >= 2.8.2, < 2.10
+* python >= 3.3, <= 3.6
+* peewee >= 2.8.2, < 3.0
 
 Warning
 -------
