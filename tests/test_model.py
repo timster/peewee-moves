@@ -82,24 +82,31 @@ def test_create_module_2_10(tmpdir, caplog):
 
     assert len(migrations) == 7
 
+    # basicfields has no relationship
     assert migrations[0].endswith('create_table_basicfields')
     assert 'created: {}'.format(migrations[0]) in caplog.text
 
+    # organization has no relationships
     assert migrations[1].endswith('create_table_organization')
     assert 'created: {}'.format(migrations[1]) in caplog.text
 
+    # since complexpersion relates to organization is then now created
     assert migrations[2].endswith('create_table_complexperson')
     assert 'created: {}'.format(migrations[2]) in caplog.text
 
+    # HasCheckConstraint has no relationships
     assert migrations[3].endswith('create_table_hascheckconstraint')
     assert 'created: {}'.format(migrations[3]) in caplog.text
 
+    # Person has no relationship
     assert migrations[4].endswith('create_table_person')
     assert 'created: {}'.format(migrations[4]) in caplog.text
 
+    # HasUniqueForeignKey relates to Person
     assert migrations[5].endswith('create_table_hasuniqueforeignkey')
     assert 'created: {}'.format(migrations[5]) in caplog.text
 
+    # RelatesToName relates to Person
     assert migrations[6].endswith('create_table_relatestoname')
     assert 'created: {}'.format(migrations[6]) in caplog.text
 
