@@ -8,6 +8,7 @@ python:
 env:
   - PEEWEE_VERSION=2.8.2
   - PEEWEE_VERSION=2.9.0
+  - PEEWEE_VERSION=2.9.2
 install:
   - "pip install peewee==$PEEWEE_VERSION"
   - "pip install python-coveralls==2.7.0"
