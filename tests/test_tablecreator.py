@@ -32,7 +32,7 @@ def test_column():
     tc.column('time', 'col_time')
     tc.column('uuid', 'col_uuid')
 
-    assert isinstance(tc.model.id, peewee.PrimaryKeyField)
+    assert isinstance(tc.model.id, peewee.AutoField)
     assert isinstance(tc.model.col_bare, peewee.BareField)
     assert isinstance(tc.model.col_biginteger, peewee.BigIntegerField)
     assert isinstance(tc.model.col_binary, peewee.BlobField)

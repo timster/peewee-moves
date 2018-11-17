@@ -56,7 +56,7 @@ class HasCheckConstraint(peewee.Model):
 
 class HasUniqueForeignKey(peewee.Model):
     age = peewee.IntegerField()
-    person = peewee.ForeignKeyField(Person, db_column="person_name", to_field='name')
+    person = peewee.ForeignKeyField(Person, column_name="person_name", field='name')
 
     class Meta:
         database = database
@@ -68,8 +68,8 @@ class HasUniqueForeignKey(peewee.Model):
 class RelatesToName(peewee.Model):
     person = peewee.ForeignKeyField(
         Person,
-        db_column="person_name",
-        to_field='name',
+        column_name="person_name",
+        field='name',
         on_update='CASCADE',
         on_delete='SET NULL')
 
