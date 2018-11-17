@@ -27,11 +27,14 @@ def test_create(tmpdir, caplog):
 
 
 @pytest.mark.skipif(peewee.__version__.startswith('2.10'),
-                    reason='Module creation is not compatible with peewee 2.10.*')
+                    reason='peewee 2.10 generate the modules depending on the module relationship')
 def test_create_module(tmpdir, caplog):
     """Test module creations.
 
-    valid module creation order prior to 2.10.*
+    peewee handles the model creation sequentially in prior versions of 2.10
+
+    Refer to:
+    https://github.com/coleifer/peewee/compare/2.9.2...2.10.0
     """
     manager = DatabaseManager(models.database, directory=tmpdir)
     manager.create(models)
@@ -62,7 +65,7 @@ def test_create_module(tmpdir, caplog):
 
 
 @pytest.mark.skipif(not peewee.__version__.startswith('2.10'),
-                    reason='Module creation is not compatible with peewee under 2.10.*')
+                    reason='peewee prior to 2.10 generate module migrations sequentially')
 def test_create_module_2_10(tmpdir, caplog):
     """Test module creations.
 
