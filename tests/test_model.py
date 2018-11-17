@@ -1,3 +1,6 @@
+import peewee
+import pytest
+
 from peewee_moves import DatabaseManager
 from peewee_moves import build_upgrade_from_model
 
@@ -23,7 +26,13 @@ def test_create(tmpdir, caplog):
     assert 'created: 0001_create_table_person' in caplog.text
 
 
+@pytest.mark.skipif(peewee.__version__.startswith('2.10'),
+                    reason='Module creation is not compatible with peewee 2.10.*')
 def test_create_module(tmpdir, caplog):
+    """Test module creations.
+
+    valid module creation order prior to 2.10.*
+    """
     manager = DatabaseManager(models.database, directory=tmpdir)
     manager.create(models)
     migrations = manager.migration_files
@@ -40,6 +49,46 @@ def test_create_module(tmpdir, caplog):
     assert 'created: {}'.format(migrations[2]) in caplog.text
 
     assert migrations[3].endswith('create_table_complexperson')
+    assert 'created: {}'.format(migrations[3]) in caplog.text
+
+    assert migrations[4].endswith('create_table_person')
+    assert 'created: {}'.format(migrations[4]) in caplog.text
+
+    assert migrations[5].endswith('create_table_hasuniqueforeignkey')
+    assert 'created: {}'.format(migrations[5]) in caplog.text
+
+    assert migrations[6].endswith('create_table_relatestoname')
+    assert 'created: {}'.format(migrations[6]) in caplog.text
+
+
+@pytest.mark.skipif(not peewee.__version__.startswith('2.10'),
+                    reason='Module creation is not compatible with peewee under 2.10.*')
+def test_create_module_2_10(tmpdir, caplog):
+    """Test module creations.
+
+    peewee changed the migration creation order in:
+    https://github.com/coleifer/peewee/compare/2.9.2...2.10.0
+    
+    First create models on which current model depends
+    (either through foreign keys or through depends_on),
+    then create current model itself.
+    """
+    manager = DatabaseManager(models.database, directory=tmpdir)
+    manager.create(models)
+    migrations = manager.migration_files
+
+    assert len(migrations) == 7
+
+    assert migrations[0].endswith('create_table_basicfields')
+    assert 'created: {}'.format(migrations[0]) in caplog.text
+
+    assert migrations[1].endswith('create_table_organization')
+    assert 'created: {}'.format(migrations[1]) in caplog.text
+
+    assert migrations[2].endswith('create_table_complexperson')
+    assert 'created: {}'.format(migrations[2]) in caplog.text
+
+    assert migrations[3].endswith('create_table_hascheckconstraint')
     assert 'created: {}'.format(migrations[3]) in caplog.text
 
     assert migrations[4].endswith('create_table_person')
