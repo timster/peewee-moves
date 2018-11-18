@@ -1,14 +1,17 @@
 language: python
 sudo: false
 python:
-  - "3.3"
   - "3.4"
   - "3.5"
   - "3.6"
 env:
-  - PEEWEE_VERSION=3.0.0
-  - PEEWEE_VERSION=3.1.0
-  - PEEWEE_VERSION=3.3.0
+  - PEEWEE_VERSION=3.0.19
+  - PEEWEE_VERSION=3.1.7
+  - PEEWEE_VERSION=3.2.5
+  - PEEWEE_VERSION=3.3.4
+  - PEEWEE_VERSION=3.4.0
+  - PEEWEE_VERSION=3.5.2
+  - PEEWEE_VERSION=3.6.4
   - PEEWEE_VERSION=3.7.1
 install:
   - "pip install peewee==$PEEWEE_VERSION"
