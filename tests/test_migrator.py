@@ -30,6 +30,8 @@ def test_create_table(tmpdir):
         table.uuid('col_uuid')
         table.add_index(('col_char', 'col_integer'), unique=True)
 
+    assert manager.database.table_exists('awesome')
+
 
 def test_drop_table(tmpdir):
     manager = DatabaseManager('sqlite:///:memory:', directory=tmpdir)
@@ -38,6 +40,7 @@ def test_drop_table(tmpdir):
         table.primary_key('id')
 
     manager.migrator.drop_table('awesome')
+    assert not manager.database.table_exists('awesome')
 
 
 def test_add_drop_column(tmpdir):
