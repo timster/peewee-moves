@@ -50,8 +50,9 @@ PEEWEE_TO_FIELD = {
     peewee.SmallIntegerField: 'smallint',
     peewee.TextField: 'text',
     peewee.TimeField: 'time',
-    peewee.TimestampField: 'int',
+    peewee.TimestampField: 'timestamp',
     peewee.UUIDField: 'uuid',
+    peewee.BinaryUUIDField: 'bin_uuid',
 }
 
 FIELD_TO_PEEWEE = {value: key for key, value in PEEWEE_TO_FIELD.items()}
@@ -259,6 +260,10 @@ class TableCreator:
         """Create a uuid column. Alias for ``table.column('uuid')``"""
         return self.column('uuid', name, **kwargs)
 
+    def bin_uuid(self, name, **kwargs):
+        """Create a binary uuid column. Alias for ``table.column('bin_uuid')``"""
+        return self.column('bin_uuid', name, **kwargs)
+
     def build_fake_model(self, name):
         """
         Build a fake model with some defaults and the given table name.
@@ -312,7 +317,6 @@ class TableCreator:
         meta.add_field(name, pk_field)
 
         field = peewee.AutoField(column_name=name)
-        field.bind(self.model, name)
         meta.add_field(name, field)
 
     def foreign_key(self, coltype, name, references, **kwargs):
@@ -341,13 +345,16 @@ class TableCreator:
                 primary_key = False
                 database = peewee.Proxy()
                 table_name = rel_table
+                indexes = ()
 
+        # relate the field to the DummyRelated Model
         rel_field_class = FIELD_TO_PEEWEE.get(coltype, peewee.IntegerField)
         rel_field = rel_field_class()
         rel_field.bind(DummyRelated, rel_column)
+        rel_field.model._meta.add_field(rel_column, rel_field)
 
-        field = peewee.ForeignKeyField(DummyRelated, column_name=name, field=rel_column, **kwargs)
-        field.bind(self.model, name)
+        field = peewee.ForeignKeyField(DummyRelated, column_name=name, field=rel_field, **kwargs)
+        self.model._meta.add_field(name, field)
 
     def add_index(self, columns, unique=False):
         """
