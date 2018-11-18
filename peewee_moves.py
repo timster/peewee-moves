@@ -46,7 +46,7 @@ PEEWEE_TO_FIELD = {
     peewee.FloatField: 'float',
     peewee.ForeignKeyField: 'foreign_key',
     peewee.IntegerField: 'int',
-    peewee.PrimaryKeyField: 'primary_key',
+    peewee.AutoField: 'primary_key',
     peewee.SmallIntegerField: 'smallint',
     peewee.TextField: 'text',
     peewee.TimeField: 'time',
@@ -296,6 +296,7 @@ class TableCreator:
         field_class = FIELD_TO_PEEWEE.get(coltype, peewee.CharField)
         field_instance = field_class(**kwargs)
         field_instance.bind(self.model, name)
+        self.model._meta.add_field(name, field_instance)
 
     def primary_key(self, name):
         """
@@ -305,10 +306,14 @@ class TableCreator:
         :param name: Name of column.
         :return: None
         """
-        pk_field = peewee.AutoField(primary_key=True)
-        self.model._meta.primary_key = pk_field
-        self.model._meta.auto_increment = True
-        pk_field.bind(self.model, name)
+        meta = self.model._meta
+        pk_field = peewee.CompositeKey([name])
+        meta.primary_key = pk_field
+        meta.add_field(name, pk_field)
+
+        field = peewee.AutoField(column_name=name)
+        field.bind(self.model, name)
+        meta.add_field(name, field)
 
     def foreign_key(self, coltype, name, references, **kwargs):
         """
@@ -390,11 +395,14 @@ class Migrator:
         :rtype: TableCreator
         """
         creator = TableCreator(name)
-        creator.model._meta.database.initialize(self.database)
+
+        # set the database in the proxy
+        meta = creator.model._meta
+        meta.database.initialize(self.database)
 
         yield creator
 
-        creator.model.create_table()
+        creator.model.create_table(safe=safe)
 
     def drop_table(self, name, safe=False, cascade=False):
         """
@@ -407,7 +415,7 @@ class Migrator:
         """
         creator = TableCreator(name)
         creator.model._meta.database.initialize(self.database)
-        self.database.drop_table(creator.model, fail_silently=safe, cascade=cascade)
+        creator.model.drop_table(safe=safe, cascade=cascade)
 
     def add_column(self, table, name, coltype, **kwargs):
         """
@@ -500,11 +508,11 @@ class Migrator:
         Run the given sql and return a cursor.
 
         :param sql: SQL string.
-        :param params: Parameters for the given SQL (deafult None).
+        :param params: Parameters for the given SQL (default None).
         :return: SQL cursor
         :rtype: cursor
         """
-        return self.database.execute_sql(sql, params=params, require_commit=False)
+        return self.database.execute_sql(sql, params=params, commit=False)
 
 
 class DatabaseManager:
