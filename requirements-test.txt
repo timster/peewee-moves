@@ -4,4 +4,3 @@ flask==1.0.2
 pytest==4.0.1
 pytest-cov==2.6.0
 pytest-mock==1.10.0
-pytest-catchlog==1.2.2

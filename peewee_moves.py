@@ -543,7 +543,7 @@ class DatabaseManager:
 
         MigrationHistory._meta.table_name = table_name or 'migration_history'
         MigrationHistory._meta.database.initialize(self.database)
-        MigrationHistory.create_table(fail_silently=True)
+        MigrationHistory.create_table(safe=True)
 
     def load_database(self, database):
         """
