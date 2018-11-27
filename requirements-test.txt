@@ -1,7 +1,7 @@
 -r requirements.txt
 
-flask==0.11.1
-pytest==2.9.0
-pytest-cov==2.2.1
-pytest-mock==1.2
+flask==1.0.2
+pytest==4.0.1
+pytest-cov==2.6.0
+pytest-mock==1.10.0
 pytest-catchlog==1.2.2
