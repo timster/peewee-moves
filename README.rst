@@ -29,11 +29,6 @@ Requirements
 * python >= 3.4, <= 3.6
 * peewee >= 3.0.0
 
-Warning
--------
-
-This package does not yet work with peewee 3. I'm working on it. Feel free to help out with pull requests if you want.
-
 Installation
 ============
 
