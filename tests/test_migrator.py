@@ -28,7 +28,10 @@ def test_create_table(tmpdir):
         table.text('col_text')
         table.time('col_time')
         table.uuid('col_uuid')
+        table.bin_uuid('col_bin_uuid')
         table.add_index(('col_char', 'col_integer'), unique=True)
+
+    assert manager.database.table_exists('awesome')
 
 
 def test_drop_table(tmpdir):
@@ -38,6 +41,7 @@ def test_drop_table(tmpdir):
         table.primary_key('id')
 
     manager.migrator.drop_table('awesome')
+    assert not manager.database.table_exists('awesome')
 
 
 def test_add_drop_column(tmpdir):
@@ -125,18 +129,9 @@ def test_foreign_key(tmpdir):
         table.primary_key('id')
         table.foreign_key('int', 'basic_id', 'basic')
 
-    with manager.migrator.create_table('related2') as table:
-        table.primary_key('id')
-        table.foreign_key('int', 'basic_id', 'basic.id')
-
-    with manager.migrator.create_table('related3') as table:
-        table.primary_key('id')
-        table.foreign_key('int', 'basic', 'basic')
-
-    with manager.migrator.create_table('related4') as table:
-        table.primary_key('id')
-        table.foreign_key('int', 'basic', 'basic.id')
-
     with manager.migrator.create_table('related5') as table:
         table.primary_key('id')
         table.foreign_key('char', 'basic', 'basic.username')
+
+    assert manager.database.table_exists('basic')
+    assert manager.database.table_exists('related1')

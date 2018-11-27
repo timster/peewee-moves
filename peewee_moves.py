@@ -3,10 +3,12 @@ import inspect
 import logging
 import os
 import pydoc
+
 from contextlib import contextmanager
 from datetime import datetime
 
 import peewee
+
 from playhouse.db_url import connect as url_connect
 from playhouse.migrate import SchemaMigrator
 
@@ -44,12 +46,13 @@ PEEWEE_TO_FIELD = {
     peewee.FloatField: 'float',
     peewee.ForeignKeyField: 'foreign_key',
     peewee.IntegerField: 'int',
-    peewee.PrimaryKeyField: 'primary_key',
+    peewee.AutoField: 'primary_key',
     peewee.SmallIntegerField: 'smallint',
     peewee.TextField: 'text',
     peewee.TimeField: 'time',
-    peewee.TimestampField: 'int',
+    peewee.TimestampField: 'timestamp',
     peewee.UUIDField: 'uuid',
+    peewee.BinaryUUIDField: 'bin_uuid',
 }
 
 FIELD_TO_PEEWEE = {value: key for key, value in PEEWEE_TO_FIELD.items()}
@@ -75,7 +78,7 @@ def build_downgrade_from_model(model):
     :return: generator
     :rtype: str
     """
-    yield "migrator.drop_table('{}')".format(model._meta.db_table)
+    yield "migrator.drop_table('{}')".format(model._meta.table_name)
 
 
 def build_upgrade_from_model(model):
@@ -87,7 +90,7 @@ def build_upgrade_from_model(model):
     :return: generator
     :rtype: str
     """
-    yield "with migrator.create_table('{}') as table:".format(model._meta.db_table)
+    yield "with migrator.create_table('{}') as table:".format(model._meta.table_name)
 
     for field in model._meta.sorted_fields:
         field_type = PEEWEE_TO_FIELD.get(field.__class__, 'char')
@@ -95,14 +98,14 @@ def build_upgrade_from_model(model):
 
         # Add all fields. Foreign Key is a special case.
         if field_type == 'foreign_key':
-            other_table = field.rel_model._meta.db_table
-            other_col = field.to_field.db_column
+            other_table = field.rel_model._meta.table_name
+            other_col = field.rel_field.column_name
             kwargs = {
                 'references': '{}.{}'.format(other_table, other_col),
                 'on_delete': field.on_delete,
                 'on_update': field.on_update,
             }
-            coltype = 'int' if field.to_field.db_field == 'primary_key' else field.to_field.db_field
+            coltype = 'int' if field.rel_field.field_type == 'primary_key' else field.rel_field.field_type
             args.append(coltype)
 
         else:
@@ -117,7 +120,7 @@ def build_upgrade_from_model(model):
             for const in field_constraints:
                 value = const
                 if isinstance(const, peewee.SQL):
-                    value = const.value
+                    value = const.sql
                 constraints.append(value)
             kwargs['constraints'] = constraints
 
@@ -127,7 +130,7 @@ def build_upgrade_from_model(model):
             argstr = '{}, '.format(argstr)
 
         # Flatten the keyword arguments for the field.
-        kwarg_list = ["'{}'".format(field.db_column)]
+        kwarg_list = ["'{}'".format(field.column_name)]
         for key, value in sorted(kwargs.items()):
             if isinstance(value, str):
                 value = "'{}'".format(value)
@@ -142,7 +145,7 @@ def build_upgrade_from_model(model):
         for const in constraints:
             value = const
             if isinstance(const, peewee.SQL):
-                value = const.value
+                value = const.sql
             yield "    table.add_constraint('{}')".format(value)
 
     # Loop through all table indexes and yield them!
@@ -152,7 +155,7 @@ def build_upgrade_from_model(model):
             index_cols = []
             for colname in columns:
                 model_field = model._meta.fields.get(colname)
-                index_cols.append(model_field and model_field.db_column or colname)
+                index_cols.append(model_field and model_field.column_name or colname)
             yield "    table.add_index({}, unique={})".format(tuple(index_cols), unique)
 
 
@@ -167,7 +170,7 @@ class MigrationHistory(peewee.Model):
 
     class Meta:
         database = peewee.Proxy()
-        db_table = 'migration_history'
+        table_name = 'migration_history'
 
 
 class TableCreator:
@@ -257,6 +260,10 @@ class TableCreator:
         """Create a uuid column. Alias for ``table.column('uuid')``"""
         return self.column('uuid', name, **kwargs)
 
+    def bin_uuid(self, name, **kwargs):
+        """Create a binary uuid column. Alias for ``table.column('bin_uuid')``"""
+        return self.column('bin_uuid', name, **kwargs)
+
     def build_fake_model(self, name):
         """
         Build a fake model with some defaults and the given table name.
@@ -270,9 +277,9 @@ class TableCreator:
             class Meta:
                 database = peewee.Proxy()
                 primary_key = False
-                indexes = []
+                indexes = ()
                 constraints = []
-                db_table = name
+                table_name = name
         return FakeModel
 
     def column(self, coltype, name, **kwargs):
@@ -292,7 +299,9 @@ class TableCreator:
         kwargs['constraints'] = new_constraints
 
         field_class = FIELD_TO_PEEWEE.get(coltype, peewee.CharField)
-        field_class(**kwargs).add_to_class(self.model, name)
+        field_instance = field_class(**kwargs)
+        field_instance.bind(self.model, name)
+        self.model._meta.add_field(name, field_instance)
 
     def primary_key(self, name):
         """
@@ -302,10 +311,13 @@ class TableCreator:
         :param name: Name of column.
         :return: None
         """
-        pk_field = peewee.PrimaryKeyField(primary_key=True)
-        self.model._meta.primary_key = pk_field
-        self.model._meta.auto_increment = True
-        pk_field.add_to_class(self.model, name)
+        meta = self.model._meta
+        pk_field = peewee.CompositeKey([name])
+        meta.primary_key = pk_field
+        meta.add_field(name, pk_field)
+
+        field = peewee.AutoField(column_name=name)
+        meta.add_field(name, field)
 
     def foreign_key(self, coltype, name, references, **kwargs):
         """
@@ -332,14 +344,17 @@ class TableCreator:
             class Meta:
                 primary_key = False
                 database = peewee.Proxy()
-                db_table = rel_table
+                table_name = rel_table
+                indexes = ()
 
+        # relate the field to the DummyRelated Model
         rel_field_class = FIELD_TO_PEEWEE.get(coltype, peewee.IntegerField)
         rel_field = rel_field_class()
-        rel_field.add_to_class(DummyRelated, rel_column)
+        rel_field.bind(DummyRelated, rel_column)
+        rel_field.model._meta.add_field(rel_column, rel_field)
 
-        field = peewee.ForeignKeyField(DummyRelated, db_column=name, to_field=rel_column, **kwargs)
-        field.add_to_class(self.model, name)
+        field = peewee.ForeignKeyField(DummyRelated, column_name=name, field=rel_field, **kwargs)
+        self.model._meta.add_field(name, field)
 
     def add_index(self, columns, unique=False):
         """
@@ -387,11 +402,14 @@ class Migrator:
         :rtype: TableCreator
         """
         creator = TableCreator(name)
-        creator.model._meta.database.initialize(self.database)
+
+        # set the database in the proxy
+        meta = creator.model._meta
+        meta.database.initialize(self.database)
 
         yield creator
 
-        creator.model.create_table()
+        creator.model.create_table(safe=safe)
 
     def drop_table(self, name, safe=False, cascade=False):
         """
@@ -404,7 +422,7 @@ class Migrator:
         """
         creator = TableCreator(name)
         creator.model._meta.database.initialize(self.database)
-        self.database.drop_table(creator.model, fail_silently=safe, cascade=cascade)
+        creator.model.drop_table(safe=safe, cascade=cascade)
 
     def add_column(self, table, name, coltype, **kwargs):
         """
@@ -497,11 +515,11 @@ class Migrator:
         Run the given sql and return a cursor.
 
         :param sql: SQL string.
-        :param params: Parameters for the given SQL (deafult None).
+        :param params: Parameters for the given SQL (default None).
         :return: SQL cursor
         :rtype: cursor
         """
-        return self.database.execute_sql(sql, params=params, require_commit=False)
+        return self.database.execute_sql(sql, params=params, commit=False)
 
 
 class DatabaseManager:
@@ -523,7 +541,7 @@ class DatabaseManager:
 
         os.makedirs(self.directory, exist_ok=True)
 
-        MigrationHistory._meta.db_table = table_name or 'migration_history'
+        MigrationHistory._meta.table_name = table_name or 'migration_history'
         MigrationHistory._meta.database.initialize(self.database)
         MigrationHistory.create_table(fail_silently=True)
 
@@ -688,7 +706,7 @@ class DatabaseManager:
         """
         driver = self.database.__class__.__name__
         database = self.database.database
-        kwargs = self.database.connect_kwargs
+        kwargs = self.database.connect_params
         LOGGER.info('driver: {}'.format(driver))
         LOGGER.info('database: {}'.format(database))
         LOGGER.info('arguments:')
@@ -886,12 +904,12 @@ class DatabaseManager:
                     if model.__name__ != item.__module__:
                         continue
                     model_list.append(item)
-            for model in peewee.sort_models_topologically(model_list):
+            for model in peewee.sort_models(model_list):
                 self.create(model)
             return True
 
         try:
-            name = 'create table {}'.format(model._meta.db_table.lower())
+            name = 'create table {}'.format(model._meta.table_name.lower())
             migration = self.next_migration(name)
             up_ops = build_upgrade_from_model(model)
             down_ops = build_downgrade_from_model(model)
