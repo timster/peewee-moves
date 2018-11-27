@@ -1,6 +1,11 @@
 Changelog
 #########
 
+2.0.0
+=====
+- Added support for Peewee 3.
+- Dropped support for Peewee 2.
+
 1.7.3
 =====
 - Added missing click dependency.
