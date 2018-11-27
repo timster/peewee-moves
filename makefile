@@ -24,12 +24,11 @@ install: clean
 	python setup.py install
 
 dist: clean
-	python setup.py sdist
-	python setup.py bdist_wheel
+	python setup.py sdist bdist_wheel
 
 release: clean
-	python setup.py sdist upload -r pypi
-	python setup.py bdist_wheel upload -r pypi
+	python setup.py sdist bdist_wheel
+	twine upload dist/*
 
 test:
 	py.test
