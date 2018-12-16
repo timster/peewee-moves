@@ -75,7 +75,7 @@ TEMPLATE = ''.join((
 def build_downgrade_from_model(model):
     """
     Build a list of 'downgrade' operations for a model class.
-    Each value that is yieled is one line to write to a file.
+    Each value that is yielded is one line to write to a file.
 
     :param model: Peewee model class or instance.
     :return: generator
@@ -87,7 +87,7 @@ def build_downgrade_from_model(model):
 def build_upgrade_from_model(model):
     """
     Build a list of 'upgrade' operations for a model class.
-    Each value that is yieled is one line to write to a file.
+    Each value that is yielded is one line to write to a file.
 
     :param model: Peewee model class or instance.
     :return: generator
