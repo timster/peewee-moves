@@ -59,6 +59,7 @@ if hasattr(peewee, 'BinaryUUIDField'):
     PEEWEE_TO_FIELD[peewee.BinaryUUIDField] = 'bin_uuid'
 
 FIELD_TO_PEEWEE = {value: key for key, value in PEEWEE_TO_FIELD.items()}
+FIELD_TO_PEEWEE['int'] = peewee.IntegerField
 FIELD_TO_PEEWEE['integer'] = peewee.IntegerField
 FIELD_TO_PEEWEE['smallinteger'] = peewee.SmallIntegerField
 FIELD_TO_PEEWEE['binary'] = peewee.BlobField

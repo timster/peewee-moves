@@ -40,7 +40,7 @@ def test_create_module(tmpdir, caplog):
     manager.create(models)
     migrations = manager.migration_files
 
-    assert len(migrations) == 7
+    assert len(migrations) == 8
 
     # basicfields has no relationship
     assert migrations[0].endswith('create_table_basicfields')
@@ -66,9 +66,13 @@ def test_create_module(tmpdir, caplog):
     assert migrations[5].endswith('create_table_hasuniqueforeignkey')
     assert 'created: {}'.format(migrations[5]) in caplog.text
 
-    # RelatesToName relates to Person
-    assert migrations[6].endswith('create_table_relatestoname')
+    # ModelWithTimestamp
+    assert migrations[6].endswith('create_table_modelwithtimestamp')
     assert 'created: {}'.format(migrations[6]) in caplog.text
+
+    # RelatesToName relates to Person
+    assert migrations[7].endswith('create_table_relatestoname')
+    assert 'created: {}'.format(migrations[7]) in caplog.text
 
 
 def test_build_upgrade_from_model():
