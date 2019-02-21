@@ -50,7 +50,7 @@ PEEWEE_TO_FIELD = {
     peewee.SmallIntegerField: 'smallint',
     peewee.TextField: 'text',
     peewee.TimeField: 'time',
-    peewee.TimestampField: 'timestamp',
+    peewee.TimestampField: 'int',
     peewee.UUIDField: 'uuid',
 }
 

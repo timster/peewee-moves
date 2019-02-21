@@ -1,6 +1,10 @@
 Changelog
 #########
 
+2.0.1
+=====
+- Fix for TimestampField.
+
 2.0.0
 =====
 - Added support for Peewee 3.

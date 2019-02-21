@@ -31,7 +31,7 @@ def test_create_module(tmpdir, caplog):
 
     peewee changed the migration creation order in:
     https://github.com/coleifer/peewee/compare/2.9.2...2.10.0
-    
+
     First create models on which current model depends
     (either through foreign keys or through depends_on),
     then create current model itself.
@@ -104,3 +104,13 @@ def test_index_field_names():
         "    table.int('age')",
         "    table.foreign_key('VARCHAR', 'person_name', on_delete=None, on_update=None, references='person.name')",
         "    table.add_index(('age', 'person_name'), unique=True)"]
+
+
+def test_timestamp_model():
+    output = build_upgrade_from_model(models.ModelWithTimestamp)
+    output = list(output)
+
+    assert output == [
+        "with migrator.create_table('modelwithtimestamp') as table:",
+        "    table.primary_key('id')",
+        "    table.int('tstamp')"]

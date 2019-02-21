@@ -75,3 +75,10 @@ class RelatesToName(peewee.Model):
 
     class Meta:
         database = database
+
+
+class ModelWithTimestamp(peewee.Model):
+    tstamp = peewee.TimestampField()
+
+    class Meta:
+        database = database
