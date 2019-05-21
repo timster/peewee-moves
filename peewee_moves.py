@@ -410,6 +410,7 @@ class Migrator:
         # set the database in the proxy
         meta = creator.model._meta
         meta.database.initialize(self.database)
+        meta.name = name
 
         yield creator
 
