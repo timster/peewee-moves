@@ -342,3 +342,49 @@ And to create a blank migration with a custom name would look like this:
 
     $ flask db revision "custom revision"
     INFO: created: 0004_custom_revision
+
+[Experimental]
+====
+
+Alternatively you can add peewee-moves to the flask manager with flask-script. Thus:
+
+.. code:: python
+
+    from flask_script import Manager
+    import app
+    manager = Manager(app)
+    
+    # Other code
+    
+    @ manager.command
+    def db (command = "", args = ""):
+         "Data base manager"
+         from click.testing import CliRunner
+         from peewee_moves import cli_command
+         runner = CliRunner ()
+
+         tmpdir = ""
+         migration_dir = str (tmpdir.join ('migrations'))
+         database = main.app.config ["DATABASE"]
+         cli_args = ['--directory', migration_dir, '--database', database]
+
+         if not command:
+             result = runner.invoke (cli_command)
+         else:
+             if args:
+                 result = runner.invoke (cli_command, cli_args + [command] + [args])
+             else:
+                 result = runner.invoke (cli_command, cli_args + [command])
+         print (str (result.stdout_bytes.decode ("utf-8")))
+
+    # Other code
+    if __name__ == "__main__":
+        # Setup flask app
+        manager.run()
+
+and run it like this:
+
+.. code:: console
+
+    python manage.py db -c create -a app.models
+    python manage.py db -c upgrade
