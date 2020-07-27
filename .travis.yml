@@ -5,14 +5,9 @@ python:
   - "3.6"
   - "3.7"
 env:
-  - PEEWEE_VERSION=3.0.19
-  - PEEWEE_VERSION=3.1.7
-  - PEEWEE_VERSION=3.2.5
-  - PEEWEE_VERSION=3.3.4
-  - PEEWEE_VERSION=3.4.0
-  - PEEWEE_VERSION=3.5.2
-  - PEEWEE_VERSION=3.6.4
-  - PEEWEE_VERSION=3.7.1
+  - PEEWEE_VERSION=3.11.2
+  - PEEWEE_VERSION=3.12.0
+  - PEEWEE_VERSION=3.13.3
 install:
   - "pip install peewee==$PEEWEE_VERSION"
   - "pip install python-coveralls==2.7.0"
