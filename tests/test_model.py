@@ -40,39 +40,34 @@ def test_create_module(tmpdir, caplog):
     manager.create(models)
     migrations = manager.migration_files
 
-    assert len(migrations) == 8
+    assert len(migrations) == 9
 
-    # basicfields has no relationship
     assert migrations[0].endswith('create_table_basicfields')
     assert 'created: {}'.format(migrations[0]) in caplog.text
 
-    # organization has no relationships
     assert migrations[1].endswith('create_table_organization')
     assert 'created: {}'.format(migrations[1]) in caplog.text
 
-    # since complexpersion relates to organization is then now created
     assert migrations[2].endswith('create_table_complexperson')
     assert 'created: {}'.format(migrations[2]) in caplog.text
 
-    # HasCheckConstraint has no relationships
-    assert migrations[3].endswith('create_table_hascheckconstraint')
+    assert migrations[3].endswith('create_table_modelwithtimestamp')
     assert 'created: {}'.format(migrations[3]) in caplog.text
 
-    # Person has no relationship
-    assert migrations[4].endswith('create_table_person')
+    assert migrations[4].endswith('create_table_foreignkeynullmodel')
     assert 'created: {}'.format(migrations[4]) in caplog.text
 
-    # HasUniqueForeignKey relates to Person
-    assert migrations[5].endswith('create_table_hasuniqueforeignkey')
+    assert migrations[5].endswith('create_table_hascheckconstraint')
     assert 'created: {}'.format(migrations[5]) in caplog.text
 
-    # ModelWithTimestamp
-    assert migrations[6].endswith('create_table_modelwithtimestamp')
+    assert migrations[6].endswith('create_table_person')
     assert 'created: {}'.format(migrations[6]) in caplog.text
 
-    # RelatesToName relates to Person
-    assert migrations[7].endswith('create_table_relatestoname')
+    assert migrations[7].endswith('create_table_hasuniqueforeignkey')
     assert 'created: {}'.format(migrations[7]) in caplog.text
+
+    assert migrations[8].endswith('create_table_relatestoname')
+    assert 'created: {}'.format(migrations[8]) in caplog.text
 
 
 def test_build_upgrade_from_model():
