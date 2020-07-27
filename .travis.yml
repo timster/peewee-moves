@@ -1,9 +1,9 @@
 language: python
 sudo: false
 python:
-  - "3.4"
   - "3.5"
   - "3.6"
+  - "3.7"
 env:
   - PEEWEE_VERSION=3.0.19
   - PEEWEE_VERSION=3.1.7
