@@ -82,3 +82,8 @@ class ModelWithTimestamp(peewee.Model):
 
     class Meta:
         database = database
+
+
+
+class ForeignKeyNullModel(peewee.Model):
+    purchase_request = peewee.ForeignKeyField(null=True, model=ModelWithTimestamp, backref='null_backref')

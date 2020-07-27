@@ -12,7 +12,7 @@ import peewee
 from playhouse.db_url import connect as url_connect
 from playhouse.migrate import SchemaMigrator
 
-__version__ = '2.0.2'
+__version__ = '2.0.3'
 
 __all__ = ['DatabaseManager', 'MigrationHistory', 'Migrator', 'SchemaMigrator', 'TableCreator']
 
@@ -109,6 +109,8 @@ def build_upgrade_from_model(model):
                 'on_delete': field.on_delete,
                 'on_update': field.on_update,
             }
+            if field.null:
+                kwargs['null'] = True
             coltype = 'int' if field.rel_field.field_type == 'primary_key' else field.rel_field.field_type
             args.append(coltype)
 

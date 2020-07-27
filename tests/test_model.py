@@ -118,3 +118,12 @@ def test_timestamp_model():
         "with migrator.create_table('modelwithtimestamp') as table:",
         "    table.primary_key('id')",
         "    table.int('tstamp')"]
+
+
+def test_nullable_foreign_key():
+    output = build_upgrade_from_model(models.ForeignKeyNullModel)
+    output = list(output)
+
+    assert output[0] == "with migrator.create_table('foreignkeynullmodel') as table:"
+    assert output[1] == "    table.primary_key('id')"
+    assert output[2] == "    table.foreign_key('AUTO', 'purchase_request_id', null=True, on_delete=None, on_update=None, references='modelwithtimestamp.id')"

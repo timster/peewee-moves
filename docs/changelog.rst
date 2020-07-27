@@ -1,6 +1,10 @@
 Changelog
 #########
 
+2.0.3
+=====
+- Handle null=True on ForeignKeyField.
+
 2.0.2
 =====
 - Fix for indexes created with "fakemodel" prefix.
