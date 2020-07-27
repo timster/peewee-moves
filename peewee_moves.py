@@ -12,7 +12,7 @@ import peewee
 from playhouse.db_url import connect as url_connect
 from playhouse.migrate import SchemaMigrator
 
-__version__ = '2.0.1'
+__version__ = '2.0.2'
 
 __all__ = ['DatabaseManager', 'MigrationHistory', 'Migrator', 'SchemaMigrator', 'TableCreator']
 
