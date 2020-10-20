@@ -255,6 +255,7 @@ API directly:
         revision   Create a blank migration file.
         status     Show information about migration status.
         upgrade    Run database upgrades.
+        fake       Fake run database upgrades.
 
 Each command requires that you specify a ``database`` and ``directory`` where
 ``database`` is the URL to your database and ``directory`` is where migration files are stored.
@@ -326,6 +327,7 @@ This gives you the following command line interface:
         revision   Create a blank migration file.
         status     Show information about the database.
         upgrade    Run database upgrades.
+        fake       Fake run database upgrades.
 
 This should look very similar since it uses the same commands we just looked at!
 

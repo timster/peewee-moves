@@ -30,4 +30,5 @@ CLI Functions
 .. autofunction:: peewee_moves.cli_revision
 .. autofunction:: peewee_moves.cli_upgrade
 .. autofunction:: peewee_moves.cli_downgrade
+.. autofunction:: peewee_moves.cli_fake
 .. autofunction:: peewee_moves.cli_delete

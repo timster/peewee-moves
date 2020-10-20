@@ -1,4 +1,4 @@
-import imp
+import importlib
 import sys
 
 from click.testing import CliRunner
@@ -17,13 +17,13 @@ def test_missing_flask(mocker):
     import peewee_moves
 
     # flask is installed, so FLASK_CLI_ENABLED is True
-    imp.reload(peewee_moves)
+    importlib.reload(peewee_moves)
     assert peewee_moves.FLASK_CLI_ENABLED
 
     # remove flask and reload, so FLASK_CLI_ENABLED is False
     mocker.patch.dict(sys.modules)
     sys.modules['flask'] = None
-    imp.reload(peewee_moves)
+    importlib.reload(peewee_moves)
 
     assert not peewee_moves.FLASK_CLI_ENABLED
 
@@ -60,6 +60,13 @@ def test_upgrade(tmpdir):
     flaskapp.root_path = str(tmpdir)
     obj = ScriptInfo(create_app=lambda info: flaskapp)
     result = runner.invoke(flask_command, ['upgrade'], obj=obj)
+    assert result.exit_code == 0
+
+
+def test_upgrade(tmpdir):
+    flaskapp.root_path = str(tmpdir)
+    obj = ScriptInfo(create_app=lambda info: flaskapp)
+    result = runner.invoke(flask_command, ['fake'], obj=obj)
     assert result.exit_code == 0
 
 

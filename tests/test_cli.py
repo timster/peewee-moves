@@ -49,6 +49,12 @@ def test_upgrade(command):
     assert result.exit_code == 0
 
 
+def test_fake(command):
+    command = command + ['fake']
+    result = runner.invoke(cli_command, command)
+    assert result.exit_code == 0
+
+
 def test_downgrade(command):
     test_revision(command)
     test_upgrade(command)

@@ -756,6 +756,37 @@ class DatabaseManager:
         LOGGER.info('deleted: {}'.format(migration))
         return True
 
+    def fake(self, target=None):
+        """
+        Fake all the migrations (up to target if specified). If no target, run all upgrades.
+        This writes to the migration table, but does not actually run the migrations.
+
+        :param target: Migration target to limit upgrades.
+        :return: True if upgrade was successful, otherwise False.
+        :rtype: bool
+        """
+        try:
+            if target:
+                target = self.find_migration(target)
+                if target in self.db_migrations:
+                    LOGGER.info('already applied: {}'.format(target))
+                    return False
+        except ValueError as exc:
+            LOGGER.error(exc)
+            return False
+
+        if not self.diff:
+            LOGGER.info('all migrations applied!')
+            return True
+
+        for name in self.diff:
+            MigrationHistory.create(name=migration)
+            # If we are at the end of the line, don't run anymore.
+            if target and target == name:
+                break
+        return True
+
+
     def upgrade(self, target=None):
         """
         Run all the migrations (up to target if specified). If no target, run all upgrades.
@@ -984,6 +1015,13 @@ def cli_upgrade(ctx, target):
     if not ctx.obj.data['manager'].upgrade(target):
         sys.exit(1)
 
+@cli_command.command('fake')
+@click.argument('target', default='')
+@click.pass_context
+def cli_fake(ctx, target):
+    """Fake run database upgrades."""
+    if not ctx.obj.data['manager'].fake(target):
+        sys.exit(1)
 
 @cli_command.command('downgrade')
 @click.argument('target', default='')
@@ -1024,5 +1062,6 @@ if FLASK_CLI_ENABLED:
     flask_command.add_command(cli_create)
     flask_command.add_command(cli_revision)
     flask_command.add_command(cli_upgrade)
+    flask_command.add_command(cli_fake)
     flask_command.add_command(cli_downgrade)
     flask_command.add_command(cli_delete)
