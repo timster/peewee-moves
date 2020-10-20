@@ -48,6 +48,17 @@ migrations will run.
     INFO: upgrade: 0002_custom_name
     INFO: upgrade: 0003_another_migration
 
+Pass the `--fake` flag to add the record to the migration history table but don't actually run the migration:
+
+.. code:: console
+
+    >>> manager.upgrade(fake=True)
+    INFO: upgrade: 0003_another_migration
+
+    >>> manager.upgrade('0001', fake=True)
+    INFO: upgrade: 0002_custom_name
+    INFO: upgrade: 0001_auto_migration
+
 Database Downgrade
 ------------------
 
@@ -61,6 +72,17 @@ specified, only the most recent migration will be downgraded.
     INFO: downgrade: 0003_another_migration
 
     >>> manager.downgrade('0001')
+    INFO: downgrade: 0002_custom_name
+    INFO: downgrade: 0001_auto_migration
+
+Pass the `--fake` flag to remove the record from migration history table but don't actually run the migration:
+
+.. code:: console
+
+    >>> manager.downgrade(fake=True)
+    INFO: downgrade: 0003_another_migration
+
+    >>> manager.downgrade('0001', fake=True)
     INFO: downgrade: 0002_custom_name
     INFO: downgrade: 0001_auto_migration
 
@@ -184,7 +206,7 @@ API:
 
 .. code:: python
 
-    with migrator.create_table(self, name, safe=False) as table:
+    with migrator.create_table(name, safe=False) as table:
         table.primary_key('colname', **kwargs)
         table.bare('colname', **kwargs)
         table.biginteger('colname', **kwargs)
@@ -255,7 +277,6 @@ API directly:
         revision   Create a blank migration file.
         status     Show information about migration status.
         upgrade    Run database upgrades.
-        fake       Fake run database upgrades.
 
 Each command requires that you specify a ``database`` and ``directory`` where
 ``database`` is the URL to your database and ``directory`` is where migration files are stored.
@@ -264,7 +285,7 @@ For example, here's how you can show the status of your database:
 
 .. code:: console
 
-    $ peewee-db --database=mydata.sqlite --directory=migrations status
+    $ peewee-db --database=sqlite:///mydata.sqlite --directory=migrations status
     INFO: [ ] 0001_create_table_auth_groups
     INFO: [ ] 0002_create_table_auth_users
 
@@ -272,8 +293,17 @@ And to create a new revision file you can do this:
 
 .. code:: console
 
-    $ peewee-db --database=mydata.sqlite --directory=migrations revision "custom revision"
+    $ peewee-db --database=sqlite:///mydata.sqlite --directory=migrations revision "custom revision"
     INFO: created: 0003_custom_revision
+
+Pass the `--fake` flag to `upgrade` or `downgrade` to update the migration history table without running the migration:
+
+.. code:: console
+    $ peewee-db --database=sqlite:///mydata.sqlite --directory=migrations upgrade --fake
+    INFO: upgrade: 0003_custom_revision
+
+    $ peewee-db --database=sqlite:///mydata.sqlite --directory=migrations upgrade
+    INFO: all migrations applied!
 
 Flask Usage
 ===========
@@ -327,7 +357,6 @@ This gives you the following command line interface:
         revision   Create a blank migration file.
         status     Show information about the database.
         upgrade    Run database upgrades.
-        fake       Fake run database upgrades.
 
 This should look very similar since it uses the same commands we just looked at!
 

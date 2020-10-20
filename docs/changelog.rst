@@ -1,6 +1,10 @@
 Changelog
 #########
 
+2.0.4
+=====
+- Added `--fake` flag for upgrade and downgrade operations.
+
 2.0.3
 =====
 - Handle null=True on ForeignKeyField.

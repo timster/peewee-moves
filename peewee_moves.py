@@ -756,42 +756,12 @@ class DatabaseManager:
         LOGGER.info('deleted: {}'.format(migration))
         return True
 
-    def fake(self, target=None):
-        """
-        Fake all the migrations (up to target if specified). If no target, run all upgrades.
-        This writes to the migration table, but does not actually run the migrations.
-
-        :param target: Migration target to limit upgrades.
-        :return: True if upgrade was successful, otherwise False.
-        :rtype: bool
-        """
-        try:
-            if target:
-                target = self.find_migration(target)
-                if target in self.db_migrations:
-                    LOGGER.info('already applied: {}'.format(target))
-                    return False
-        except ValueError as exc:
-            LOGGER.error(exc)
-            return False
-
-        if not self.diff:
-            LOGGER.info('all migrations applied!')
-            return True
-
-        for name in self.diff:
-            MigrationHistory.create(name=migration)
-            # If we are at the end of the line, don't run anymore.
-            if target and target == name:
-                break
-        return True
-
-
-    def upgrade(self, target=None):
+    def upgrade(self, target=None, fake=False):
         """
         Run all the migrations (up to target if specified). If no target, run all upgrades.
 
         :param target: Migration target to limit upgrades.
+        :param fake: Should the migration actually run?.
         :return: True if upgrade was successful, otherwise False.
         :rtype: bool
         """
@@ -810,7 +780,7 @@ class DatabaseManager:
             return True
 
         for name in self.diff:
-            success = self.run_migration(name, 'upgrade')
+            success = self.run_migration(name, 'upgrade', fake=fake)
             # If it didn't work, don't try any more and exit.
             if not success:
                 return False
@@ -819,11 +789,12 @@ class DatabaseManager:
                 break
         return True
 
-    def downgrade(self, target=None):
+    def downgrade(self, target=None, fake=False):
         """
         Run all the migrations (down to target if specified). If no target, run one downgrade.
 
         :param target: Migration target to limit downgrades.
+        :param fake: Should the migration actually run?.
         :return: True if downgrade was successful, otherwise False.
         :rtype: bool
         """
@@ -844,7 +815,7 @@ class DatabaseManager:
             return False
 
         for name in diff:
-            success = self.run_migration(name, 'downgrade')
+            success = self.run_migration(name, 'downgrade', fake=fake)
             # If it didn't work, don't try any more.
             if not success:
                 return False
@@ -853,7 +824,7 @@ class DatabaseManager:
                 break
         return True
 
-    def run_migration(self, migration, direction='upgrade'):
+    def run_migration(self, migration, direction='upgrade', fake=False):
         """
         Run a single migration. Does not check to see if migration has already been applied.
 
@@ -869,17 +840,18 @@ class DatabaseManager:
             return False
 
         try:
-            LOGGER.info('{}: {}'.format(direction, migration))
+            LOGGER.info('{}: {} FAKE({})'.format(direction, migration, fake))
             with self.database.transaction():
-                scope = {
-                    '__file__': self.get_filename(migration),
-                }
-                with self.open_migration(migration, 'r') as handle:
-                    exec(handle.read(), scope)
+                if not fake:
+                    scope = {
+                        '__file__': self.get_filename(migration),
+                    }
+                    with self.open_migration(migration, 'r') as handle:
+                        exec(handle.read(), scope)
 
-                method = scope.get(direction, None)
-                if method:
-                    method(self.migrator)
+                    method = scope.get(direction, None)
+                    if method:
+                        method(self.migrator)
 
                 if direction == 'upgrade':
                     MigrationHistory.create(name=migration)
@@ -1009,26 +981,20 @@ def cli_revision(ctx, name):
 
 @cli_command.command('upgrade')
 @click.argument('target', default='')
+@click.option('--fake', is_flag=True, help="Update migration table but don't run migration.")
 @click.pass_context
-def cli_upgrade(ctx, target):
+def cli_upgrade(ctx, target, fake):
     """Run database upgrades."""
-    if not ctx.obj.data['manager'].upgrade(target):
-        sys.exit(1)
-
-@cli_command.command('fake')
-@click.argument('target', default='')
-@click.pass_context
-def cli_fake(ctx, target):
-    """Fake run database upgrades."""
-    if not ctx.obj.data['manager'].fake(target):
+    if not ctx.obj.data['manager'].upgrade(target, fake):
         sys.exit(1)
 
 @cli_command.command('downgrade')
 @click.argument('target', default='')
+@click.option('--fake', is_flag=True, help="Update migration table but don't run migration.")
 @click.pass_context
-def cli_downgrade(ctx, target):
+def cli_downgrade(ctx, target, fake):
     """Run database downgrades."""
-    if not ctx.obj.data['manager'].downgrade(target):
+    if not ctx.obj.data['manager'].downgrade(target, fake):
         sys.exit(1)
 
 
@@ -1062,6 +1028,5 @@ if FLASK_CLI_ENABLED:
     flask_command.add_command(cli_create)
     flask_command.add_command(cli_revision)
     flask_command.add_command(cli_upgrade)
-    flask_command.add_command(cli_fake)
     flask_command.add_command(cli_downgrade)
     flask_command.add_command(cli_delete)

@@ -63,13 +63,6 @@ def test_upgrade(tmpdir):
     assert result.exit_code == 0
 
 
-def test_upgrade(tmpdir):
-    flaskapp.root_path = str(tmpdir)
-    obj = ScriptInfo(create_app=lambda info: flaskapp)
-    result = runner.invoke(flask_command, ['fake'], obj=obj)
-    assert result.exit_code == 0
-
-
 def test_downgrade(tmpdir):
     flaskapp.root_path = str(tmpdir)
     obj = ScriptInfo(create_app=lambda info: flaskapp)
