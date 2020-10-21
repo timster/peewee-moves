@@ -1,7 +1,7 @@
 Changelog
 #########
 
-2.0.4
+2.1.0
 =====
 - Added `--fake` flag for upgrade and downgrade operations.
 
