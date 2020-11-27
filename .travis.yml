@@ -4,6 +4,7 @@ python:
   - "3.5"
   - "3.6"
   - "3.7"
+  - "3.8"
 env:
   - PEEWEE_VERSION=3.11.2
   - PEEWEE_VERSION=3.12.0
