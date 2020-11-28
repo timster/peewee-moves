@@ -196,9 +196,9 @@ migration to support that.
 Migrator API
 ============
 
-The previous exmple shows the files that were created automatically to support two models.
+The previous example shows the files that were created automatically to support two models.
 The argument to upgrade() and downgrade() is a migrator instance that has a database-agnostic API.
-This allows you to write command in Python that will get executed against the database when
+This allows you to write commands in Python that will get executed against the database when
 upgrade() and downgrade() are called.
 
 Here's a full example of everything you can do in either upgrade() or downgrade() using the migrator
@@ -331,7 +331,7 @@ This can be a connection string as shown above, or also a dict or ``peewee.Datab
         'name': 'test.sqlite'
     }
 
-The ``db`` command will automatically add the command to the cli if Flask is installed:
+The ``db`` command is automatically added to the cli if Flask is installed:
 
 .. code:: console
 
