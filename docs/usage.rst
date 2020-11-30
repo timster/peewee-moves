@@ -230,9 +230,9 @@ API:
 
     migrator.drop_table('name', safe=False, cascade=False)
     migrator.add_column('table', 'name', 'type', **kwargs)
-    migrator.drop_column('table', 'name', 'field', cascade=True)
+    migrator.drop_column('table', 'name', cascade=True)
     migrator.rename_column('table', 'old_name', 'new_name')
-    migrator.rename('table', 'old_name', 'new_name')
+    migrator.rename_table('old_name', 'new_name')
     migrator.add_not_null('table', 'column')
     migrator.drop_not_null('table', 'column')
     migrator.add_index('table', 'columns', unique=False)
