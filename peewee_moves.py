@@ -111,7 +111,8 @@ def build_upgrade_from_model(model):
             }
             if field.null:
                 kwargs['null'] = True
-            coltype = 'int' if field.rel_field.field_type == 'primary_key' else field.rel_field.field_type
+            rel_field_type = field.rel_field.field_type.lower()
+            coltype = 'int' if rel_field_type == 'primary_key' else rel_field_type
             args.append(coltype)
 
         else:
@@ -354,7 +355,7 @@ class TableCreator:
                 indexes = ()
 
         # relate the field to the DummyRelated Model
-        rel_field_class = FIELD_TO_PEEWEE.get(coltype, peewee.IntegerField)
+        rel_field_class = FIELD_TO_PEEWEE.get(coltype.lower(), peewee.IntegerField)
         rel_field = rel_field_class()
         rel_field.bind(DummyRelated, rel_column)
         rel_field.model._meta.add_field(rel_column, rel_field)
